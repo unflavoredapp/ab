@@ -63,7 +63,7 @@ struct BodycamBackdrop: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: w * x - 20, y: h * y - 20, width: 40, height: 40)), with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.63, blue: 0.27).opacity(0.25), .clear]), center: CGPoint(x: w * x, y: h * y), startRadius: 1, endRadius: 20))
                 ctx.fill(Path(ellipseIn: CGRect(x: w * x - 3, y: h * y - 3, width: 6, height: 6)), with: .color(Color(red: 1, green: 0.75, blue: 0.43)))
             }
-            ctx.fill(Path(CGRect(origin: .zero, size: sz)), with: .linearGradient(Gradient(colors: [Color.black.opacity(0.16), .clear, Color.black.opacity(0.38)]), startPoint: .top, endPoint: .bottom))
+            ctx.fill(Path(CGRect(origin: .zero, size: sz)), with: .linearGradient(Gradient(colors: [Color.black.opacity(0.16), .clear, Color.black.opacity(0.38)]), startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: h)))
         }
         .ignoresSafeArea()
     }

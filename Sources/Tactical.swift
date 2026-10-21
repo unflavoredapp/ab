@@ -1245,7 +1245,8 @@ final class TacticalEngine {
         }
         var vs = TMove.State(z: pz, vz: pvz, wallRunT: wallRunT, wallLock: wallLock, wallGrace: wallGrace, wallN: wallN)
         let vr = TMove.step(&vs, dt: dt, jump: wantJump, move: mv, aim: p.aim, baseSpeed: sp) { a in
-            TMap.rayHit(p.pos, a, TMove.wallProbe)
+            let dist = TMap.rayDist(p.pos, a, TMove.wallProbe)
+            return (dist: dist, top: TMap.wallH)
         }
         wantJump = false
         pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN

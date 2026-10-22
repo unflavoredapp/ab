@@ -100,7 +100,7 @@ for dt in dts {
     let r = sim(dt: dt, move: CGVector(dx: 1, dy: 0), start: CGPoint(x: 0, y: 82), wallY: 100, top: 80)
     wallTs.append(r.wallT); wallZs.append(r.maxZ)
     print("  top 80, dt \(f(dt * 1000, 1)) ms: on wall \(f(r.wallT)) s, peak z \(f(r.maxZ, 1)) u")
-    check(r.wallT > 0.2 && r.wallT <= TMove.wallRunMax + 0.05, "wall-run lasts at most \(f(TMove.wallRunMax)) s")
+    check(r.wallT > 0.8 && r.wallT <= TMove.wallRunMax + 0.05, "wall-run lasts 0.8...\(f(TMove.wallRunMax)) s")
     check(r.maxZ <= 80 - TMove.wallMinOver + 8, "feet stay below top - margin")
 }
 check((wallTs.max() ?? 0) - (wallTs.min() ?? 0) < 0.12, "wall-run time does not depend on frame rate")
@@ -124,6 +124,57 @@ for dt in dts {
     check(r.kickAt >= 0, "wall-jump fires")
     check(r.maxZ > 80 && r.maxZ < 125, "wall-jump peak 80...125 u")
     check(r.landings >= 1, "lands afterwards")
+}
+
+print("\n6. momentum (ground acceleration, air momentum, dash chains)")
+do {
+    let d: CGFloat = 1.0 / 60
+    var v = CGVector.zero
+    var st = TMove.State()
+    for _ in 0..<15 { TMove.horizontal(&v, st, wish: CGVector(dx: 1, dy: 0), speed: 170, dt: d) }
+    print("  run speed after 0.25 s: \(f(v.dx, 0)) u/s")
+    check(v.dx > 160, "reaches run speed within 0.25 s")
+    v = CGVector(dx: 640, dy: 0)
+    for _ in 0..<60 { TMove.horizontal(&v, st, wish: CGVector(dx: 1, dy: 0), speed: 170, dt: d) }
+    check(abs(v.dx - 170) < 10, "a ground dash slides back to run speed within 1 s")
+    st.z = 40; st.vz = 10
+    v = CGVector(dx: 640, dy: 0)
+    for _ in 0..<30 { TMove.horizontal(&v, st, wish: .zero, speed: 170, dt: d) }
+    print("  air dash speed after 0.5 s with no input: \(f(v.dx, 0)) u/s")
+    check(v.dx > 540, "momentum is kept in the air")
+    v = CGVector(dx: 640, dy: 0)
+    for _ in 0..<30 { TMove.horizontal(&v, st, wish: CGVector(dx: 0, dy: 1), speed: 170, dt: d) }
+    check(v.dy > 60 && hypot(v.dx, v.dy) > 400, "air steering turns you without killing your speed")
+    st.onWall = true; st.wallT = CGVector(dx: 1, dy: 0); st.wallN = CGVector(dx: 0, dy: -1)
+    v = CGVector(dx: 500, dy: 0)
+    TMove.horizontal(&v, st, wish: CGVector(dx: 1, dy: 0), speed: 170, dt: d)
+    check(v.dx >= 499, "a dash into a wall run keeps its speed")
+    v = CGVector(dx: 100, dy: 0)
+    TMove.horizontal(&v, st, wish: CGVector(dx: 1, dy: 0), speed: 170, dt: d)
+    check(v.dx >= 170 * (1 + TMove.wallRunBoost) - 1, "wall run is faster than running")
+    var c = CGVector(dx: 0, dy: 200)
+    TMove.clipToCollision(&c, fix: CGVector(dx: 0, dy: -3))
+    check(abs(c.dy) < 0.001, "velocity into a wall is removed after a collision")
+}
+
+print("\n7. standing on props")
+do {
+    var s7 = TMove.State()
+    var landedOn: CGFloat = -1
+    for i in 0..<120 {
+        let g: CGFloat = (s7.z >= 38 || s7.ground == 38) ? 38 : 0
+        let r = TMove.step(&s7, dt: 1.0 / 60, jump: i == 0, move: .zero, aim: 0, baseSpeed: 170, ground: g) { _ in (TMove.wallProbe, 0) }
+        if r.landed { landedOn = s7.z; break }
+    }
+    check(landedOn == 38, "jump onto a 38 u crate and land on its top")
+    _ = TMove.step(&s7, dt: 1.0 / 60, jump: false, move: .zero, aim: 0, baseSpeed: 170, ground: 0) { _ in (TMove.wallProbe, 0) }
+    check(s7.z < 38 && s7.z > 30, "walking off the crate you fall")
+    var s8 = TMove.State()
+    s8.z = 40; s8.vz = -50
+    let lifted = TMove.swordLift(&s8)
+    check(lifted && s8.vz >= TMove.swordLiftV, "a slash in the air launches you (sword jump)")
+    let again = TMove.swordLift(&s8)
+    check(!again && s8.vz >= TMove.airSlashHang, "later air slashes only hang, no second launch")
 }
 
 print(failures == 0 ? "\nALL MOVEMENT CHECKS PASSED" : "\n\(failures) MOVEMENT CHECKS FAILED")

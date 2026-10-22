@@ -5,7 +5,7 @@ enum TacLobbyMaps {
     static let ids = [3]
     static let fallback = 3
 
-    private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
+    private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX", "TOWN", "DUEL ARENA"]
 
     static func title(_ k: Int) -> String {
         names.indices.contains(k) ? names[k] : "TOWN"

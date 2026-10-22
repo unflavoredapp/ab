@@ -16,4 +16,18 @@ extension TMap {
         if hitK < solidKind.count, let kind = solidKind[hitK] { top = propH(kind) }
         return (maxD * best, top)
     }
+
+    /// Height you stand on at `p`: the top of a prop (crate, car, sandbag...) under you whose top is at or
+    /// just above your feet, else 0 (the street). Walls are never stood on.
+    static func groundTop(_ p: CGPoint, feet: CGFloat, r: CGFloat = 10) -> CGFloat {
+        var best: CGFloat = 0
+        TGrid.forEachNear(p, r + 2) { k in
+            guard k < solidKind.count, let kind = solidKind[k] else { return false }
+            guard solid[k].insetBy(dx: -r * 0.6, dy: -r * 0.6).contains(p) else { return false }
+            let top = propH(kind)
+            if top <= feet + TMove.stepUp && top > best { best = top }
+            return false
+        }
+        return best
+    }
 }

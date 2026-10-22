@@ -307,6 +307,12 @@ final class TPlayer {
     var fireCd: CGFloat = 0
     var flash: CGFloat = 0
     var hurt: CGFloat = 0
+    /// feet height above the street (the local player jumps, wall-runs, stands on props; bots stay at 0)
+    var z: CGFloat = 0
+    /// knockback velocity from a hit, decays quickly
+    var knock = CGVector.zero
+    /// vertical speed (bots hop up at a target above them)
+    var vz: CGFloat = 0
     var kills = 0
     var deaths = 0
     var dmgDealt: CGFloat = 0
@@ -595,6 +601,8 @@ final class TacticalEngine {
     var dashT: CGFloat = 0
     var dashCd: CGFloat = 0
     var dashDir = CGVector.zero
+    /// the local player's horizontal velocity (momentum)
+    var pvel = CGVector.zero
     var ms = TMove.State()
     var dashSpd: CGFloat = 640
     var kick: CGFloat = 0
@@ -643,7 +651,7 @@ final class TacticalEngine {
     func setup(gun: String, diff: Int, mode: Int = 0) {
         self.diff = diff
         gameMode = mode
-        TMap.load(3)
+        TMap.load(mode == 8 ? 9 : 3)   // Duel is fought in the vertical arena, everything else in the Town
         tags = []
         myGun = gun
         let nb = mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9))
@@ -730,6 +738,7 @@ final class TacticalEngine {
             p.blind = 0
             p.pingCd = 0
             p.knife = true
+            p.z = 0; p.vz = 0; p.knock = .zero
             p.crouch = false
             p.hiding = false
             p.cover = nil
@@ -872,6 +881,18 @@ final class TacticalEngine {
         var defusing = false
         updateDoors(dt)
         playerUpdate(dt, &planting, &defusing)
+        for p in players where !p.isPlayer && p.alive && abs(p.knock.dx) + abs(p.knock.dy) > 4 {
+            p.pos.x += p.knock.dx * dt; p.pos.y += p.knock.dy * dt
+            TMap.push(&p.pos, 14)
+            let k = CGFloat(exp(Double(-7 * dt)))
+            p.knock.dx *= k; p.knock.dy *= k
+        }
+        // bots' hops: simple ballistic arc back down to the street
+        for p in players where !p.isPlayer && p.alive && (p.z > 0 || p.vz != 0) {
+            p.z += p.vz * dt - 0.5 * TMove.gravity * dt * dt
+            p.vz -= TMove.gravity * dt
+            if p.z <= 0 { p.z = 0; p.vz = 0 }
+        }
         for p in players where !p.isPlayer && p.alive { botThink(p, dt, &planting, &defusing) }
         for i in packs.indices where !packs[i].taken {
             for p in players where p.alive && p.hp < 100 && tDist(p.pos, packs[i].pos) < 24 {
@@ -1009,7 +1030,8 @@ final class TacticalEngine {
     }
 
     private func respawnPlayer(_ p: TPlayer) {
-        if p.isPlayer { rbuf.removeAll(); replayOn = false; pz = 0; pvz = 0; wallRunT = 0; ms = TMove.State(); dashT = 0 }
+        if p.isPlayer { rbuf.removeAll(); replayOn = false; pz = 0; pvz = 0; wallRunT = 0; ms = TMove.State(); dashT = 0; pvel = .zero }
+        p.z = 0; p.vz = 0; p.knock = .zero
         if gameMode == 7 { frontRespawn(p); return }
         var list = p.id % 2 == 0 ? TMap.atkSpawn : TMap.defSpawn
         if gameMode != 0 && gameMode != 6 { list = TMap.spreadPoints(14, sep: 500) + list }
@@ -1098,7 +1120,7 @@ final class TacticalEngine {
     }
 
     private func swapGun(_ p: TPlayer) {
-        if p.knife { p.knife = false; p.fireCd = 0.3; return }
+        if p.knife { p.knife = false; p.fireCd = 0.12; return }
         guard gameMode != 3, p.reloadT <= 0 else { return }
         let g = p.gun, m = p.mag, s = p.spare
         p.gun = p.altGun; p.mag = p.altMag; p.spare = p.altSpare
@@ -1228,15 +1250,15 @@ final class TacticalEngine {
         } else if hypot(mv.dx, mv.dy) > 0.2 {
             p.aim = turnToward(p.aim, atan2(mv.dy, mv.dx), 9 * dt)
         }
-        p.pos.x += mv.dx * sp * dt
-        p.pos.y += mv.dy * sp * dt
-        // movement state carried between frames (wall run, climb, wall jumps, dash hang time)
+        // movement state carried between frames (momentum, wall run, climb, wall jumps, dash hang time)
         var vs = ms
         vs.z = pz; vs.vz = pvz
         dashCd = max(0, dashCd - dt)
         if wantDash {
             wantDash = false
             if dashCd <= 0 && p.alive, let d = TMove.dash(&vs, move: mv, aim: p.aim) {
+                // a dash is an impulse: it chains into a jump or a wall run and keeps its speed there
+                pvel = CGVector(dx: d.dir.dx * d.speed, dy: d.dir.dy * d.speed)
                 dashDir = d.dir
                 dashT = d.time
                 dashSpd = d.speed
@@ -1245,35 +1267,39 @@ final class TacticalEngine {
                 if d.kind == .wall { pop(p.pos, "WALL DASH", TUI.gold) }
             }
         }
-        if dashT > 0 {
-            dashT -= dt
-            p.pos.x += dashDir.dx * dashSpd * dt
-            p.pos.y += dashDir.dy * dashSpd * dt
-        }
-        let vr = TMove.step(&vs, dt: dt, jump: wantJump, move: mv, aim: p.aim, baseSpeed: sp) { a in
+        dashT = max(0, dashT - dt)
+        let gnd = TMap.groundTop(p.pos, feet: vs.z)
+        let vr = TMove.step(&vs, dt: dt, jump: wantJump, move: mv, aim: p.aim, baseSpeed: sp, ground: gnd) { a in
             TMap.rayHit(p.pos, a, TMove.wallProbe)
         }
         wantJump = false
-        ms = vs
-        pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN
-        p.pos.x += vr.pushV.dx * dt
-        p.pos.y += vr.pushV.dy * dt
         if let k = vr.kick {
-            dashDir = k; dashT = TMove.wallKickT; dashSpd = TMove.wallKickSpeed
+            // kick away from the wall, keeping the speed you had along it
+            let along = max(0, pvel.dx * vs.wallT.dx + pvel.dy * vs.wallT.dy)
+            pvel = CGVector(dx: k.dx * TMove.wallKickSpeed + vs.wallT.dx * along * 0.35,
+                            dy: k.dy * TMove.wallKickSpeed + vs.wallT.dy * along * 0.35)
             pop(p.pos, "WALL JUMP", TUI.gold)
         }
-        TMap.push(&p.pos, 14)
+        TMove.horizontal(&pvel, vs, wish: mv, speed: sp, dt: dt)
+        let want = CGPoint(x: p.pos.x + pvel.dx * dt, y: p.pos.y + pvel.dy * dt)
+        p.pos = want
+        // walls always block; props only block while your feet are below their top
+        TMap.push(&p.pos, 14, height: vs.z)
+        TMove.clipToCollision(&pvel, fix: CGVector(dx: p.pos.x - want.x, dy: p.pos.y - want.y))
+        ms = vs
+        pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN
+        p.z = pz
         p.fireCd -= dt
         if wantReload { wantReload = false; startReload(p) }
         if wantSlash { wantSlash = false; if p.alive && p.fireCd <= 0 { slash(p, blade: true); swordJump(p) } }
         if wantSwap { wantSwap = false; swapGun(p) }
-        if wantKnife { wantKnife = false; if !p.knife { p.knife = true; p.reloadT = 0; scoped = false; ads = false; p.fireCd = max(p.fireCd, 0.3) } }
-        if wantGun { wantGun = false; if p.knife { p.knife = false; p.fireCd = max(p.fireCd, 0.3) } }
+        if wantKnife { wantKnife = false; if !p.knife { p.knife = true; p.reloadT = 0; scoped = false; ads = false; p.fireCd = max(p.fireCd, 0.12) } }
+        if wantGun { wantGun = false; if p.knife { p.knife = false; p.fireCd = max(p.fireCd, 0.12) } }
         if p.reloadT > 0 {
             p.reloadT -= dt
             if p.reloadT <= 0 { finishReload(p) }
         } else if firing && p.fireCd <= 0 && !actHeld {
-            if p.knife { slash(p); swordJump(p) } else if p.mag > 0 { shoot(p, 0) } else { startReload(p) }
+            if p.knife { slash(p, blade: true); swordJump(p) } else if p.mag > 0 { shoot(p, 0) } else { startReload(p) }
         }
         if wantNade { wantNade = false; throwNade(p, p.aim, 420) }
         if wantFlash { wantFlash = false; throwNade(p, p.aim, 400, flash: true) }
@@ -1346,6 +1372,7 @@ final class TacticalEngine {
             guard d < bd else { continue }
             let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
             guard abs(tAngDiff(ang, p.aim)) < (blade ? 1.2 : 0.95), TMap.los(p.pos, v.pos) else { continue }
+            guard abs(v.z - p.z) < 56 else { continue }          // over their head or under their feet: miss
             bd = d
             best = v
         }
@@ -1356,6 +1383,18 @@ final class TacticalEngine {
             damage(v, (behind ? ABRules.backstabDmg : (blade ? ABRules.slashDmg : ABRules.knifeDmg)) * (p.isPlayer ? 1 : [0.8, 1, 1][diff]), by: p.id)
             knifeKill = false
             if behind && p.isPlayer { pop(v.pos, "BACKSTAB", TUI.gold) }
+            // hit reaction: knocked back and staggered; a fighter in the air is knocked up (juggle)
+            let kd = max(0.001, tDist(p.pos, v.pos))
+            let kn = CGVector(dx: (v.pos.x - p.pos.x) / kd, dy: (v.pos.y - p.pos.y) / kd)
+            let force: CGFloat = behind ? 380 : (blade ? 300 : 220)
+            if v.isPlayer {
+                pvel.dx += kn.dx * force; pvel.dy += kn.dy * force
+                if pz > TMove.minAirZ { pvz = max(pvz, 120); ms.vz = pvz }
+                shake = max(shake, 10)
+            } else {
+                v.knock = CGVector(dx: kn.dx * force, dy: kn.dy * force)
+                v.fireCd = max(v.fireCd, 0.35)
+            }
             hit = true
         }
         let tip = CGPoint(x: p.pos.x + cos(p.aim) * 34, y: p.pos.y + sin(p.aim) * 34)
@@ -1403,8 +1442,13 @@ final class TacticalEngine {
             var bl = Bullet(pos: CGPoint(x: p.pos.x + cos(a) * muzzle, y: p.pos.y + sin(a) * muzzle),
                             vel: CGVector(dx: cos(a) * spd, dy: sin(a) * spd), dmg: ABRules.bulletDmg(g.dmg * (p.isPlayer ? am.dmgMul * gm.dmg : [0.85, 1, 1][diff]), cls: TWeapons.cls(p.gun)),
                             life: g.range * am.rangeMul / spd + 0.15, owner: p.id, team: p.team, tf: tfl)
-            bl.h = p.isPlayer ? (p.crouch ? CGFloat(TMap.eyeH) - 14 : CGFloat(TMap.eyeH)) : 48
+            bl.h = (p.isPlayer ? (p.crouch ? CGFloat(TMap.eyeH) - 14 : CGFloat(TMap.eyeH)) : 48) + p.z
             bl.vh = spd * tan(pa)
+            if !p.isPlayer, let t = players.first(where: { $0.id == p.targetID && $0.alive }) {
+                // bots lead their shot up or down to where your body is (with some error)
+                let d = max(40, tDist(p.pos, t.pos))
+                bl.vh = spd * ((t.z + 40) - bl.h) / d * CGFloat.random(in: 0.9...1.1)
+            }
             bullets.append(bl)
         }
         p.mag -= 1
@@ -1433,7 +1477,10 @@ final class TacticalEngine {
         victim.hp -= victim.crouch ? amt * 0.7 : amt
         victim.hurt = 0.25
         if owner > -2 && impacts.count < 48 { impacts.append(Impact(pos: victim.pos, nx: 0, ny: 0, kind: 1)) }
-        if owner == 0 && victim.team != me.team { hitT = 0.2 }
+        if owner == 0 && victim.team != me.team {
+            hitT = 0.2
+            pop(victim.pos, "\(Int(max(1, amt)))", amt >= 30 ? TUI.gold : Color.white)
+        }
         if victim.isPlayer && owner > -2 { shake = max(shake, 8) }
         if victim.isPlayer && gameMode == 6 && owner >= 0 && amt >= 10 { raidWound() }
         if let o = players.first(where: { $0.id == owner }), o.team != victim.team {
@@ -1490,12 +1537,16 @@ final class TacticalEngine {
             b.h += b.vh * dt
             b.life -= dt
             if b.life <= 0 { continue }
-            if b.h < 0 || b.h > CGFloat(TMap.wallH) { continue }      // into the floor or ceiling
+            if b.h < 0 || b.h > (TMap.townStyle ? 900 : CGFloat(TMap.wallH)) { continue }      // into the floor or ceiling
+            let hMid = (hPrev + b.h) / 2
             var dead = false
             var hitK = -1
             let bnow = b.pos
             TGrid.forEachSeg(old, bnow) { k in
                 guard tSegT(old, bnow, TMap.solid[k]) != nil else { return false }
+                // a bullet flying over a crate or above a wall's top passes it
+                let topK: CGFloat = (k < TMap.solidKind.count ? TMap.solidKind[k].map { TMap.propH($0) } : nil) ?? TMap.wallTop
+                guard hMid < topK else { return false }
                 let mt = TMap.solidMat[k]
                 if mt == .brick || mt == .concrete { noteImpact(old, bnow, TMap.solid[k], 0); TMap.hit(k, b.dmg * 0.9); dead = true; return true }
                 hitK = k
@@ -1515,8 +1566,8 @@ final class TacticalEngine {
             } else { b.inK = -1 }
             for v in players where v.alive && v.team != b.team {
                 let top: CGFloat = v.crouch ? 54 : 78
-                let hm = (hPrev + b.h) / 2
-                if tPointSeg(v.pos, old, b.pos) < 15 && hm >= 0 && hm <= top {
+                // the body spans the fighter's feet to head: shots over or under them miss
+                if tPointSeg(v.pos, old, b.pos) < 15 && hMid >= v.z && hMid <= v.z + top {
                     damage(v, b.dmg, by: b.owner)
                     dead = true
                     break
@@ -1796,6 +1847,8 @@ final class TacticalEngine {
             let mt = turn[diff] * dt
             p.aim += max(-mt, min(mt, df))
             p.reactT -= dt
+            // a target standing on high ground or in the air: hop up to meet them
+            if p.knife && e.z - p.z > 28 && d < 150 && p.z <= 0.5 && Double.random(in: 0...1) < Double(dt) * 6 { p.vz = 300 }
             if p.reactT <= 0 && abs(df) < 0.14 && p.fireCd <= 0 && p.reloadT <= 0 && p.mag > 0 {
                 if p.knife {
                     if d < 92 { slash(p, blade: true) }

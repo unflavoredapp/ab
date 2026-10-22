@@ -533,7 +533,7 @@ final class TacScene {
         fill.look(at: MXVector3(0, 0, 0))
 
         let lampCols: [UIColor] = [C(0.75, 0.86, 1), C(1, 0.84, 0.58), C(1, 0.72, 0.46)]
-        for rm in TMap.rooms where rm.mat < 6 && TMap.kind != 3 {
+        for rm in TMap.rooms where rm.mat < 6 && !TMap.townStyle {
             let n = TMap.kind == 7 ? max(1, Int(rm.r.width / 350)) : max(1, Int(rm.r.width / 600))
             for j in 0..<n {
                 let lx = rm.r.minX + rm.r.width * (CGFloat(j) + 0.5) / CGFloat(n)
@@ -641,7 +641,7 @@ final class TacScene {
             switch rm.mat {
             case 6: img = grassTex()
             case 7: img = noiseTex(b, "dirt7", dots: 2200, grid: false)
-            case 8: img = (TMap.kind == 3 ? townTex("town_cobble") : nil) ?? noiseTex(b, "asph8", dots: 3000, grid: true)
+            case 8: img = (TMap.townStyle ? townTex("town_cobble") : nil) ?? noiseTex(b, "asph8", dots: 3000, grid: true)
             case 0: img = noiseTex(b, "sand0", dots: 2600, grid: false)
             case 4: img = woodTex(b, "wood4")
             case 3, 5: img = tileTex(b, "tile\(rm.mat)")
@@ -651,7 +651,7 @@ final class TacScene {
             case 12, 13, 16: img = tileTex(b, "tile\(rm.mat)")
             default: img = noiseTex(b, "carpet", dots: 1400, grid: false)
             }
-            let tile: CGFloat = (TMap.kind == 3 && rm.mat == 8) ? 200 : (rm.mat == 6 ? 170 : (rm.mat == 1 ? 140 : (rm.mat == 3 || rm.mat == 5 ? 112 : 128)))
+            let tile: CGFloat = (TMap.townStyle && rm.mat == 8) ? 200 : (rm.mat == 6 ? 170 : (rm.mat == 1 ? 140 : (rm.mat == 3 || rm.mat == 5 ? 112 : 128)))
             let side = mat(nil, color: ui(b, 0.5))
             let ffl = TMap.floorOfX(rm.r.midX)
             for pc in carve(rm.r, stairHoles(ffl, upper: true)) {
@@ -660,7 +660,7 @@ final class TacScene {
                 fr(pc.midX).addChildNode(n)
             }
         }
-        if TMap.kind == 3 { townDecor(fr) }
+        if TMap.townStyle { townDecor(fr) }
         // rugs
         for rg in TMap.rugs {
             let c = UIColor(cgColor: UIColor(rg.1).cgColor)
@@ -750,7 +750,7 @@ final class TacScene {
             let wf = TMap.floorOfX(o.midX)
             let img = wf == 0 ? cinder : (wf == 1 ? (woodsMap ? bark : paper) : plank)
             let tile: CGFloat = wf == 1 ? 160 : 128
-            let townWall = TMap.kind == 3 && wf == 1
+            let townWall = TMap.townStyle && wf == 1
             let tall = townWall || (woodsMap && wf == 1 && min(o.width, o.height) > 40)
             let hh: CGFloat = tall ? 260 : wallH
             var front = mat(img, sx: o.width / tile, sy: hh / tile)
@@ -1598,7 +1598,7 @@ final class TacScene {
             rt.scale = MXVector3(ks, ks * (p.crouch ? 0.74 : 1), ks)
             rt.position = MXVector3(Float(sx(p.pos)), Float(TMap.floorOf(p.pos) - focusFloor) * stackH + stackAnim - liftF + Float(TMap.smooth ? (TMap.stairLift(p.pos) ?? 0) : 0), Float(p.pos.y))
             rt.eulerAngles = MXVector3(0, Float(-p.aim), 0)
-            if p.isPlayer { rt.position = MXVector3(rt.position.x, rt.position.y + Float(e.pz), rt.position.z) }
+            rt.position = MXVector3(rt.position.x, rt.position.y + Float(p.isPlayer ? e.pz : p.z), rt.position.z)
             heads[i].eulerAngles = MXVector3(0, Float(p.aim), 0)
             if p.alive {
                 deadK[i] = 0

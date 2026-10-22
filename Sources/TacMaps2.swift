@@ -282,3 +282,52 @@ enum TDesert {
         return md
     }
 }
+
+// MARK: - Duel arena (kind 9): a compact, vertical town square built for acrobatics.
+// A central tower, four pillars and two lane walls are spaced for wall-run -> wall-jump -> wall-run chains
+// (kicks carry ~250-320 u), and crate -> shelf steps give high ground you have to jump to reach.
+
+enum TArena {
+    static let shared: MapData = build()
+
+    private static func build() -> MapData {
+        let b = MapBuilder()
+        let rc = b.rc
+        let arena = rc(900, 450, 1200, 900)
+        b.gap(1, arena, 8)
+        b.rooms.append(TRoom(name: "Arena", r: MapBuilder.R(1, arena), mat: 0, fl: 1))
+        // solid blocks inside the square: they become full-height building fronts
+        let blocks: [CGRect] = [
+            rc(1425, 825, 150, 150),                                  // central tower
+            rc(1150, 650, 100, 100), rc(1750, 650, 100, 100),         // pillars
+            rc(1150, 1050, 100, 100), rc(1750, 1050, 100, 100),
+            rc(1300, 575, 400, 50), rc(1300, 1175, 400, 50),          // lane walls
+        ]
+        for r in blocks { b.setR(1, r, false) }
+        b.doors = []
+        let layout = b.layout([.concrete, .brick, .concrete])
+        // steps to the high ground: crate (38) -> shelf (66), and cars / sandbags as low cover
+        b.p(1, .crate, 975, 525, 60, 60); b.p(1, .shelf, 1035, 525, 60, 60)
+        b.p(1, .crate, 1965, 1215, 60, 60); b.p(1, .shelf, 1905, 1215, 60, 60)
+        b.p(1, .crate, 1965, 525, 60, 60); b.p(1, .crate, 975, 1215, 60, 60)
+        b.p(1, .car, 1460, 700, 110, 56); b.p(1, .car, 1460, 1045, 110, 56)
+        b.p(1, .sandbag, 1000, 880, 32, 120); b.p(1, .sandbag, 1968, 800, 32, 120)
+        b.p(1, .barrel, 1290, 900, 36, 36); b.p(1, .barrel, 1680, 900, 36, 36)
+
+        func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x + 3200, y: y) }
+        var spawns: [CGPoint] = []
+        for i in 0..<20 {
+            let a = CGFloat(i) / 20 * 2 * CGFloat.pi
+            spawns.append(P(1500 + cos(a) * 520, 900 + sin(a) * 380))
+        }
+        let atk = (0..<5).map { P(990, 760 + CGFloat($0) * 70) }
+        let def = (0..<5).map { P(2010, 760 + CGFloat($0) * 70) }
+        let packs = [P(1500, 520), P(1500, 1280), P(1080, 900), P(1920, 900)]
+        var md = MapData(rooms: b.rooms, floorTiles: b.tiles, layout: layout, props: b.props, packPos: packs, stairs: [], stairLo: [],
+                         siteA: MapBuilder.R(1, rc(950, 500, 200, 200)), siteB: MapBuilder.R(1, rc(1850, 1100, 200, 200)),
+                         atkSpawn: atk, defSpawn: def, hubZone: MapBuilder.R(1, rc(1400, 800, 200, 200)),
+                         floorNames: ["", "ARENA", ""], loot: [], roofs: b.roofs, spawns: spawns)
+        md.siteNames = ["A · WEST", "B · EAST"]
+        return md
+    }
+}

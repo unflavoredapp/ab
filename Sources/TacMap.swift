@@ -9,12 +9,14 @@ enum TMap {
     static let nFloors = 3
     static var W: CGFloat = 3000
     static var H: CGFloat = 1800
-    static var look: Int { (kind == 6 || kind == 7) ? 0 : ((kind == 4 || kind == 5) ? 2 : kind) }
+    static var look: Int { kind == 9 ? 3 : ((kind == 6 || kind == 7) ? 0 : ((kind == 4 || kind == 5) ? 2 : kind)) }
+    /// the AIRBLADE town look and rules (tall building fronts, cobbles, open sky): Town and the Duel arena
+    static var townStyle: Bool { kind == 3 || kind == 9 }
     static var totalW: CGFloat { off * 3 }
     static let th: CGFloat = 14
     static let wallH: CGFloat = 80
     /// collision / wall-run height of walls: the Town's buildings are full height
-    static var wallTop: CGFloat { kind == 3 ? 260 : wallH }
+    static var wallTop: CGFloat { townStyle ? 260 : wallH }
     static let eyeH: CGFloat = 54
 
     static var kind = 0
@@ -200,6 +202,7 @@ enum TMap {
         case 5: cur = TCustom.shared
         case 6: cur = TApartment.shared
         case 7: cur = TAnnex.shared
+        case 9: cur = TArena.shared
         default: cur = THouse.shared
         }
         let d = cur

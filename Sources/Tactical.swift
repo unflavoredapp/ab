@@ -2807,8 +2807,8 @@ struct TacticalPlay: View {
                             .buttonStyle(TuiPress()).position(x: W - 40, y: H - 104)
                         Button { e.wantJump = true } label: { vbtn("arrow.up", 46) }
                             .buttonStyle(TuiPress()).position(x: W - 40, y: H - 46)
-                        Button { e.wantReload = true } label: { vbtn("arrow.triangle.2.circlepath", 38) }
-                            .buttonStyle(TuiPress()).position(x: W - 214, y: H - 40)
+                        Button { e.wantDash = true } label: { vbtn("bolt.fill", 46, on: e.dashCd <= 0) }
+                            .buttonStyle(TuiPress()).position(x: W - 100, y: H - 46)
                         AirbladeWeaponBox(e: e).position(x: W / 2, y: H - 30)
                     } else {
                         Button { e.fast.toggle() } label: {

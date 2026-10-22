@@ -107,11 +107,7 @@ struct CharacterCreateView: View {
         GeometryReader { g in
             let W = g.size.width, H = g.size.height
             ZStack {
-                HideoutBackdrop()
-                AirbladeHero()
-                    .frame(width: W * 0.30, height: H * 0.60)
-                    .position(x: W * 0.5, y: H * 0.36)
-                    .allowsHitTesting(false)
+                // the hero stands in the 3D hideout behind this screen (HideoutBackdrop in Lobby.swift)
                 HStack(spacing: 10) {
                     AirbladeLogo(size: 17)
                     Rectangle().fill(Color.white.opacity(0.3)).frame(width: 1, height: 16)

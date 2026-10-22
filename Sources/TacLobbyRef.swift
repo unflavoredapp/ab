@@ -322,7 +322,7 @@ struct LobbyHome: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            hero
+            // the hero stands in the 3D hideout behind this page (HideoutBackdrop in Lobby.swift)
 
             VStack(alignment: .leading, spacing: 5 * u) {
                 websiteCard

@@ -31,7 +31,7 @@ struct LobbyView: View {
         GeometryReader { g in
             let t = game.s.ex.tac ?? TacData()
             ZStack {
-                HideoutBackdrop()
+                HideoutBackdrop(hero: !created || screen == 0)
                 if !created {
                     CharacterCreateView {
                         username = TacProfile.name

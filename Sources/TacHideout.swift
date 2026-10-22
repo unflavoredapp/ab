@@ -62,7 +62,27 @@ struct BladeEmblem: View {
 /// The hideout behind the lobby: a rain-streaked night skyline with a bridge through steel windows,
 /// a pinned-up evidence board, a weapon rack, a workbench with an ammo crate and an old rug.
 struct HideoutBackdrop: View {
+    /// show the hero standing in the room (lobby home and character creation)
+    var hero = false
+    /// the painted room (Resources/hideout_bg.jpg, blender-scripts/hideout_paint.py); the code-drawn room is the fallback
+    static let bgImage: UIImage? = Bundle.main.path(forResource: "hideout_bg", ofType: "jpg").flatMap { UIImage(contentsOfFile: $0) }
+
     var body: some View {
+        if HideoutStage.available {
+            // the real 3D room, rendered live by the Metal engine
+            HideoutStage(hero: hero).ignoresSafeArea()
+        } else if let bg = Self.bgImage {
+            GeometryReader { g in
+                Image(uiImage: bg).resizable().interpolation(.high).scaledToFill()
+                    .frame(width: g.size.width, height: g.size.height).clipped()
+            }
+            .ignoresSafeArea()
+        } else {
+            drawn
+        }
+    }
+
+    private var drawn: some View {
         Canvas { ctx, sz in
             let w = sz.width, h = sz.height
             func col(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> Color { Color(red: r, green: g, blue: b).opacity(a) }
@@ -335,7 +355,7 @@ struct LobbyShell<Content: View>: View {
         let ri = TacRank.index(xp)
         let a = LS.area(size)
         return ZStack {
-            HideoutBackdrop()
+            // the 3D room is drawn once behind every lobby page (Lobby.swift); nothing to draw here
             content
                 .frame(width: a.width, height: a.height)
                 .position(x: a.width / 2, y: LS.topH + a.height / 2)

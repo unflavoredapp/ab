@@ -109,8 +109,8 @@ struct CharacterCreateView: View {
             ZStack {
                 HideoutBackdrop()
                 AirbladeHero()
-                    .frame(width: W * 0.34, height: H * 1.0)
-                    .position(x: W * 0.5, y: H * 0.46)
+                    .frame(width: W * 0.30, height: H * 0.60)
+                    .position(x: W * 0.5, y: H * 0.36)
                     .allowsHitTesting(false)
                 HStack(spacing: 10) {
                     AirbladeLogo(size: 17)

@@ -1,16 +1,61 @@
 import SwiftUI
 
-/// AIRBLADE logotype shared by the lobby, the shell and character creation
+/// AIRBLADE logotype shared by the lobby, the shell and character creation: heavy italic caps cut by slashes
 struct AirbladeLogo: View {
     var size: CGFloat = 25
 
     var body: some View {
-        Text("AIRBLADE")
-            .font(.system(size: size, weight: .black, design: .serif).italic())
-            .foregroundStyle(LinearGradient(colors: [.white, Color(red: 0.48, green: 0.72, blue: 1), .white], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .shadow(color: Color.blue.opacity(0.45), radius: size * 0.3)
-            .lineLimit(1)
-            .fixedSize()
+        ZStack {
+            Text("AIRBLADE")
+                .font(.system(size: size, weight: .black, design: .default).italic())
+                .tracking(size * 0.02)
+                .foregroundStyle(LinearGradient(colors: [.white, Color(red: 0.72, green: 0.82, blue: 0.98), Color(red: 0.36, green: 0.58, blue: 0.95)], startPoint: .top, endPoint: .bottom))
+                .shadow(color: Color(red: 0.2, green: 0.45, blue: 1).opacity(0.6), radius: size * 0.22)
+                .lineLimit(1)
+                .fixedSize()
+            // slashes through the wordmark
+            Group {
+                Rectangle().fill(Color(red: 0.07, green: 0.09, blue: 0.14)).frame(width: size * 0.07, height: size * 1.5)
+                    .rotationEffect(.degrees(24)).offset(x: -size * 1.55, y: 0)
+                Rectangle().fill(Color(red: 0.07, green: 0.09, blue: 0.14)).frame(width: size * 0.07, height: size * 1.5)
+                    .rotationEffect(.degrees(24)).offset(x: size * 1.2, y: 0)
+            }
+            // blade swoosh underneath
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: size * 0.16))
+                p.addQuadCurve(to: CGPoint(x: size * 5.2, y: 0), control: CGPoint(x: size * 2.2, y: size * 0.1))
+                p.addQuadCurve(to: CGPoint(x: 0, y: size * 0.16), control: CGPoint(x: size * 2.4, y: size * 0.28))
+            }
+            .fill(LinearGradient(colors: [.clear, Color(red: 0.4, green: 0.65, blue: 1), .white], startPoint: .leading, endPoint: .trailing))
+            .frame(width: size * 5.2, height: size * 0.3)
+            .offset(y: size * 0.72)
+        }
+        .frame(height: size * 1.25)
+        .fixedSize()
+    }
+}
+
+/// red blade emblem used for the player's clan / profile tile
+struct BladeEmblem: View {
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height
+            ZStack {
+                Path { p in
+                    p.move(to: CGPoint(x: w * 0.5, y: h * 0.04))
+                    p.addLine(to: CGPoint(x: w * 0.9, y: h * 0.26)); p.addLine(to: CGPoint(x: w * 0.8, y: h * 0.74))
+                    p.addLine(to: CGPoint(x: w * 0.5, y: h * 0.96)); p.addLine(to: CGPoint(x: w * 0.2, y: h * 0.74)); p.addLine(to: CGPoint(x: w * 0.1, y: h * 0.26))
+                    p.closeSubpath()
+                }
+                .fill(LinearGradient(colors: [Color(red: 0.85, green: 0.12, blue: 0.14), Color(red: 0.45, green: 0.04, blue: 0.08)], startPoint: .top, endPoint: .bottom))
+                Path { p in
+                    p.move(to: CGPoint(x: w * 0.5, y: h * 0.2)); p.addLine(to: CGPoint(x: w * 0.62, y: h * 0.62)); p.addLine(to: CGPoint(x: w * 0.5, y: h * 0.8)); p.addLine(to: CGPoint(x: w * 0.38, y: h * 0.62)); p.closeSubpath()
+                    p.move(to: CGPoint(x: w * 0.22, y: h * 0.3)); p.addLine(to: CGPoint(x: w * 0.4, y: h * 0.5)); p.addLine(to: CGPoint(x: w * 0.3, y: h * 0.58)); p.closeSubpath()
+                    p.move(to: CGPoint(x: w * 0.78, y: h * 0.3)); p.addLine(to: CGPoint(x: w * 0.6, y: h * 0.5)); p.addLine(to: CGPoint(x: w * 0.7, y: h * 0.58)); p.closeSubpath()
+                }
+                .fill(Color(red: 0.12, green: 0.02, blue: 0.04))
+            }
+        }
     }
 }
 
@@ -154,6 +199,8 @@ struct HideoutBackdrop: View {
                 gun.move(to: CGPoint(x: x - CGFloat(i % 3) * 2, y: h * 0.76)); gun.addLine(to: CGPoint(x: x + 1 + CGFloat(i % 2) * 3, y: h * 0.4 + CGFloat((i * 13) % 4) * h * 0.02))
                 ctx.stroke(gun, with: .color(col(0.045, 0.05, 0.055)), lineWidth: 5)
                 ctx.fill(Path(CGRect(x: x - 3, y: h * 0.5 - 2, width: 8, height: 4)), with: .color(col(0.3, 0.3, 0.28)))
+                ctx.fill(Path(CGRect(x: x - 5, y: h * 0.62, width: 7, height: h * 0.1)), with: .color(col(0.06, 0.065, 0.07)))
+                ctx.fill(Path(CGRect(x: x + 1, y: h * 0.52, width: 3, height: h * 0.05)), with: .color(col(0.2, 0.2, 0.19, 0.7)))
             }
 
             // ---- workbench with books and a lamp
@@ -196,6 +243,64 @@ struct HideoutBackdrop: View {
             ctx.fill(Path(locker), with: .color(col(0.1, 0.105, 0.11)))
             ctx.stroke(Path(locker), with: .color(col(0.28, 0.28, 0.27)), lineWidth: 2)
             ctx.fill(Path(CGRect(x: locker.midX - 5, y: locker.minY + 14, width: 10, height: 14)), with: .color(col(0.75, 0.38, 0.12)))
+
+            // ---- ceiling beams and trusses
+            ctx.fill(Path(CGRect(x: 0, y: 0, width: w, height: h * 0.045)), with: .color(col(0.045, 0.04, 0.035)))
+            for i in 0..<5 {
+                let bx = w * (0.08 + CGFloat(i) * 0.22)
+                var truss = Path()
+                truss.move(to: CGPoint(x: bx, y: 0)); truss.addLine(to: CGPoint(x: bx + w * 0.07, y: h * 0.13))
+                ctx.stroke(truss, with: .color(col(0.05, 0.045, 0.04, 0.9)), lineWidth: 7)
+            }
+            // ---- neon / bokeh lights in the city
+            for (k, c) in [(0.07, col(1, 0.35, 0.55)), (0.15, col(0.35, 0.8, 1)), (0.24, col(1, 0.75, 0.35)), (0.31, col(0.5, 0.6, 1)), (0.2, col(1, 0.45, 0.4)), (0.05, col(0.4, 0.9, 0.8))] as [(CGFloat, Color)] {
+                let cx = w * k, cy = h * (0.26 + k * 0.5)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - 18, y: cy - 18, width: 36, height: 36)), with: .radialGradient(Gradient(colors: [c.opacity(0.4), .clear]), center: CGPoint(x: cx, y: cy), startRadius: 1, endRadius: 18))
+            }
+            // ---- hanging banner with the blade emblem
+            let ban = CGRect(x: w * 0.235, y: h * 0.24, width: w * 0.09, height: h * 0.27)
+            ctx.fill(Path(ban), with: .linearGradient(Gradient(colors: [col(0.12, 0.1, 0.11), col(0.06, 0.05, 0.06)]), startPoint: ban.origin, endPoint: CGPoint(x: ban.minX, y: ban.maxY)))
+            ctx.stroke(Path(ban), with: .color(col(0.3, 0.27, 0.26, 0.6)), lineWidth: 1.2)
+            var em = Path()
+            em.move(to: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.14))
+            em.addLine(to: CGPoint(x: ban.maxX - ban.width * 0.14, y: ban.minY + ban.height * 0.3)); em.addLine(to: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.62)); em.addLine(to: CGPoint(x: ban.minX + ban.width * 0.14, y: ban.minY + ban.height * 0.3)); em.closeSubpath()
+            ctx.fill(em, with: .color(col(0.62, 0.08, 0.1)))
+            ctx.draw(Text("AIRBLADE").font(.system(size: max(7, w * 0.0085), weight: .black).italic()).foregroundColor(col(0.8, 0.8, 0.82, 0.8)), at: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.82), anchor: .center)
+            // ---- pinned photos get a face each
+            for i in 0..<26 where i % 2 == 0 {
+                let pw = CGFloat(20 + (i * 11) % 26), ph = CGFloat(15 + (i * 7) % 22)
+                let px = board.minX + 6 + CGFloat((i * 37) % 97) / 100 * (board.width - pw - 12)
+                let py = board.minY + 6 + CGFloat((i * 23) % 91) / 100 * (board.height - ph - 12)
+                ctx.fill(Path(ellipseIn: CGRect(x: px + pw * 0.36, y: py + ph * 0.18, width: pw * 0.28, height: ph * 0.34)), with: .color(col(0.12, 0.1, 0.09, 0.8)))
+                ctx.fill(Path(CGRect(x: px + pw * 0.24, y: py + ph * 0.56, width: pw * 0.52, height: ph * 0.32)), with: .color(col(0.12, 0.1, 0.09, 0.7)))
+            }
+            // ---- desk lamp with a green shade, a helmet and a second ammo crate
+            ctx.fill(Path(CGRect(x: w * 0.318, y: h * 0.6, width: 3, height: h * 0.11)), with: .color(col(0.1, 0.1, 0.09)))
+            var shade = Path()
+            shade.move(to: CGPoint(x: w * 0.3, y: h * 0.62)); shade.addLine(to: CGPoint(x: w * 0.345, y: h * 0.62)); shade.addLine(to: CGPoint(x: w * 0.335, y: h * 0.575)); shade.addLine(to: CGPoint(x: w * 0.31, y: h * 0.575)); shade.closeSubpath()
+            ctx.fill(shade, with: .color(col(0.1, 0.32, 0.2)))
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.3, y: h * 0.58, width: w * 0.045, height: h * 0.12)), with: .radialGradient(Gradient(colors: [col(1, 0.82, 0.45, 0.35), .clear]), center: CGPoint(x: w * 0.3225, y: h * 0.64), startRadius: 1, endRadius: w * 0.03))
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.235, y: h * 0.655, width: w * 0.04, height: h * 0.055)), with: .color(col(0.16, 0.18, 0.14)))
+            let crate2 = CGRect(x: w * 0.29, y: h * 0.8, width: w * 0.14, height: h * 0.13)
+            ctx.fill(Path(crate2), with: .color(col(0.16, 0.19, 0.12)))
+            ctx.stroke(Path(crate2), with: .color(col(0.07, 0.09, 0.05)), lineWidth: 2)
+            ctx.fill(Path(CGRect(x: crate2.minX, y: crate2.minY, width: crate2.width, height: 4)), with: .color(col(0.25, 0.29, 0.18)))
+            // ---- wall lantern, top right
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.93 - 40, y: h * 0.1 - 40, width: 80, height: 80)), with: .radialGradient(Gradient(colors: [col(1, 0.72, 0.35, 0.5), .clear]), center: CGPoint(x: w * 0.93, y: h * 0.1), startRadius: 2, endRadius: 40))
+            ctx.fill(Path(CGRect(x: w * 0.93 - 8, y: h * 0.08, width: 16, height: 22)), with: .color(col(0.95, 0.75, 0.4)))
+            // ---- wet floor: reflections of the window and the lamps
+            for i in 0..<14 {
+                let fx = w * (0.02 + CGFloat(i) * 0.07)
+                ctx.fill(Path(CGRect(x: fx, y: h * 0.84, width: 3 + CGFloat(i % 3) * 2, height: h * 0.14)), with: .linearGradient(Gradient(colors: [col(0.6, 0.7, 1, 0.1), .clear]), startPoint: CGPoint(x: fx, y: h * 0.84), endPoint: CGPoint(x: fx, y: h * 0.98)))
+            }
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.1, y: h * 0.84, width: w * 0.3, height: h * 0.1)), with: .radialGradient(Gradient(colors: [col(1, 0.78, 0.45, 0.18), .clear]), center: CGPoint(x: w * 0.25, y: h * 0.89), startRadius: 1, endRadius: w * 0.15))
+            // scattered papers on the floor
+            for i in 0..<5 {
+                var paper = Path()
+                let px = w * (0.58 + CGFloat(i) * 0.05), py = h * (0.86 + CGFloat(i % 2) * 0.05)
+                paper.move(to: CGPoint(x: px, y: py)); paper.addLine(to: CGPoint(x: px + 22, y: py - 3)); paper.addLine(to: CGPoint(x: px + 26, y: py + 8)); paper.addLine(to: CGPoint(x: px + 3, y: py + 11)); paper.closeSubpath()
+                ctx.fill(paper, with: .color(col(0.7, 0.68, 0.6, 0.55)))
+            }
 
             // ---- lighting: window spill, warm corners, vignette
             ctx.fill(Path(CGRect(origin: .zero, size: sz)), with: .linearGradient(Gradient(colors: [col(0, 0, 0, 0.22), .clear, col(0, 0, 0, 0.45)]), startPoint: .zero, endPoint: CGPoint(x: 0, y: h)))

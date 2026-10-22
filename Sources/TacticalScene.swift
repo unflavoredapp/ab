@@ -78,6 +78,9 @@ final class TacScene {
     var pitch: CGFloat = 1.0
     var dist: CGFloat = 430
     var legLs: [MXNode] = []
+    var heroCloth: [Int: HeroCloth] = [:]
+    var heroClothIdx: [Int] = []
+    var heroClothN = 0
     var deadK = [Float](repeating: 0, count: 64)
     var mvK = [Float](repeating: 0, count: 64)
     var legRs: [MXNode] = []
@@ -1023,7 +1026,7 @@ final class TacScene {
             let teamC: UIColor = p.team == e.me.team ? UIColor(red: 0.25, green: 0.6, blue: 1, alpha: 1) : UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1)
             let pStyle = TacAvatar.style(p.isPlayer ? TacAvatar.myKey : p.handle)
             var stf: TacOperator.Bot? = nil
-            if p.rank == 0, let b = TacOperator.bot(style: pStyle), b.setGun(p.gun) { stf = b }
+            if !HeroBody.available, p.rank == 0, let b = TacOperator.bot(style: pStyle), b.setGun(p.gun) { stf = b }
             stfBots.append(stf)
             let body: MXNode, gun: MXNode, fl: MXNode, head: MXNode
             if let b = stf {
@@ -1039,7 +1042,11 @@ final class TacScene {
                 faceMats.append(MXMaterial())
                 body = b.root; gun = b.gunHolder; fl = b.flash
             } else {
-                let sol = TwRig.soldier(team: p.isPlayer ? col : teamC, style: pStyle, rank: p.rank)
+                var heroSol: TwSoldier? = nil
+                if let h = HeroBody.make(team: p.isPlayer ? col : teamC) { heroSol = h.sol; heroCloth[heroClothN] = h.cloth }
+                heroClothIdx.append(heroSol != nil ? heroClothN : -1)
+                heroClothN += 1
+                let sol = heroSol ?? TwRig.soldier(team: p.isPlayer ? col : teamC, style: pStyle, rank: p.rank)
                 kevs.append(sol.kev); helms.append(sol.helm); heavies.append(sol.heavy); hats.append(sol.hat)
                 body = sol.root
                 gun = sol.holder
@@ -1554,6 +1561,7 @@ final class TacScene {
                     legLs[i].eulerAngles = MXVector3(0, 0, sw)
                     legRs[i].eulerAngles = MXVector3(0, 0, -sw)
                 }
+                if i < heroClothIdx.count, let hc = heroCloth[heroClothIdx[i]] { hc.update(t: Float(e.time), run: mvK[i], yawVel: 0) }
                 let bob = abs(Float(cos(walkPh[i]))) * 0.9 * mvK[i] + sin(Float(e.time) * 1.6 + Float(i)) * 0.12
                 let lean: Float = -0.1 * mvK[i] + (p.flash > 0 ? 0.045 : 0)
                 bodies[i].eulerAngles = MXVector3(0, 0, lean)

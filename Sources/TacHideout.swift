@@ -483,6 +483,12 @@ struct HideoutHotspots: View {
             // rects were measured on the 1705 px art; scale them if the file is a different size
             let k = iw / 1705
             ZStack(alignment: .topLeading) {
+                // the hero (drawn by HideoutBackdrop at 0.53 W): tap to inspect
+                Color.clear
+                    .frame(width: W * 0.16, height: H * 0.76)
+                    .contentShape(Rectangle())
+                    .onTapGesture { act(.screen(17)) }
+                    .position(x: W * 0.53, y: H * 0.54)
                 ForEach(spots, id: \.label) { sp in
                     let r = CGRect(x: ox + sp.rect.minX * k * s, y: oy + sp.rect.minY * k * s, width: sp.rect.width * k * s, height: sp.rect.height * k * s)
                     let on = pressed == sp.label

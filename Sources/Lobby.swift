@@ -57,6 +57,7 @@ struct LobbyView: View {
                     case 14: CamoLabView(back: { screen = 12 })
                     case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; startMatch() })
                     case 15: InventoryView(t: t, size: g.size, act: homeAct)
+                    case 17: HeroInspectView(t: t, size: g.size, act: homeAct)
                     case 16: MissionBoardView(t: t, size: g.size, diff: $diff, act: homeAct) { op in
                         nav.tacMode = op.mode
                         nav.tacMap = TacLobbyMaps.fallback

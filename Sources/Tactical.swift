@@ -618,6 +618,9 @@ final class TacticalEngine {
     var wallN = CGVector.zero
     var dashT: CGFloat = 0
     var dashCd: CGFloat = 0
+    var dashCdMax: CGFloat = 0.8
+    /// short glow on the dash button the moment it comes back
+    var dashReadyT: CGFloat = 0
     var dashDir = CGVector.zero
     /// the local player's horizontal velocity (momentum)
     var pvel = CGVector.zero
@@ -1276,7 +1279,10 @@ final class TacticalEngine {
         // movement state carried between frames (momentum, wall run, climb, wall jumps, dash hang time)
         var vs = ms
         vs.z = pz; vs.vz = pvz
+        let dashWas = dashCd > 0
         dashCd = max(0, dashCd - dt)
+        if dashWas && dashCd <= 0 { dashReadyT = 0.35 }
+        dashReadyT = max(0, dashReadyT - dt)
         if wantDash {
             wantDash = false
             if dashCd <= 0 && p.alive, let d = TMove.dash(&vs, move: mv, aim: p.aim) {
@@ -1286,6 +1292,7 @@ final class TacticalEngine {
                 dashT = d.time
                 dashSpd = d.speed
                 dashCd = d.kind == .ground ? 0.8 : 0.35
+                dashCdMax = dashCd
                 jumpT = max(jumpT, 0.3)
                 if d.kind == .wall { pop(p.pos, "WALL DASH", TUI.gold) }
             }
@@ -2402,6 +2409,7 @@ struct TacticalPlay: View {
     @State private var rKnob: CGPoint = .zero
     @State private var collected = false
     @State private var result: ABResult? = nil
+    @State private var showControls = false
     @State private var autoOn = true
     @State private var bridge: TacScene? = nil
     private var fp: Bool { true }
@@ -2562,7 +2570,7 @@ struct TacticalPlay: View {
                         .gesture(DragGesture(minimumDistance: 0)
                             .onChanged { v in
                                 if fp {
-                                    let sens: CGFloat = engine.scoped ? 0.0035 : (engine.ads ? 0.0055 : 0.008)
+                                    let sens: CGFloat = (engine.scoped ? 0.0035 : (engine.ads ? 0.0055 : 0.008)) * ABControls.lookMul(aiming: engine.scoped || engine.ads)
                                     engine.lookDelta += (v.translation.width - lastLook) * sens
                                     lastLook = v.translation.width
                                     // free look: dragging up looks up
@@ -2654,7 +2662,7 @@ struct TacticalPlay: View {
             .contentShape(Circle().inset(by: -18))
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { v in
-                    let sens: CGFloat = engine.scoped ? 0.0035 : (engine.ads ? 0.0055 : 0.008)
+                    let sens: CGFloat = (engine.scoped ? 0.0035 : (engine.ads ? 0.0055 : 0.008)) * ABControls.lookMul(aiming: engine.scoped || engine.ads)
                     engine.lookDelta += (v.translation.width - crossLast.width) * sens
                     engine.pitch = max(-0.75, min(0.75, engine.pitch - (v.translation.height - crossLast.height) * sens * 0.8))
                     crossLast = v.translation
@@ -2911,13 +2919,8 @@ struct TacticalPlay: View {
                         .buttonStyle(TuiPress()).position(x: W - 36, y: 236)
                     }
                     if e.me.alive {
-                        Button { e.toggleCover() } label: { vbtn("figure.stand", 46, on: e.me.crouch) }
-                            .buttonStyle(TuiPress()).position(x: W - 40, y: H - 104)
-                        Button { e.wantJump = true } label: { vbtn("arrow.up", 46) }
-                            .buttonStyle(TuiPress()).position(x: W - 40, y: H - 46)
-                        Button { e.wantDash = true } label: { vbtn("bolt.fill", 46, on: e.dashCd <= 0) }
-                            .buttonStyle(TuiPress()).position(x: W - 100, y: H - 46)
-                        AirbladeWeaponBox(e: e).position(x: W / 2, y: H - 30)
+                        // dash / jump / crouch / weapon box, placed by the player's saved control layout
+                        AirbladeTouchControls(e: e, W: W, H: H).position(x: W / 2, y: H / 2)
                     } else {
                         Button { e.fast.toggle() } label: {
                             HStack(spacing: 6) {
@@ -2982,6 +2985,7 @@ struct TacticalPlay: View {
         TimelineView(.periodic(from: .now, by: 0.1)) { _ in
             ZStack {
                 if engine.paused && !engine.over { pauseView }
+                if showControls && engine.paused && !engine.over { ControlsEditorView { showControls = false } }
                 if engine.over { if engine.gameMode == 6 { overView } else { resultsView } }
                 if !engine.me.alive && !engine.over && !engine.paused {
                     AirbladeDown(e: engine) { showLoadout = true; engine.paused = true }
@@ -3024,6 +3028,17 @@ struct TacticalPlay: View {
                     Text("PAUSED").font(.jk(24, .heavy)).tracking(2).foregroundColor(.white)
                 }
                 .padding(.bottom, 4)
+                Button { showControls = true } label: {
+                    HStack(spacing: 8) {
+                        SF("hand.tap.fill").font(.system(size: 13, weight: .bold))
+                        Text("CONTROLS").font(.jk(14, .heavy))
+                        Spacer()
+                        Text("Layout, size, sensitivity").font(.jk(11, .medium)).foregroundColor(.white.opacity(0.5))
+                    }
+                    .foregroundColor(.white).padding(.horizontal, 14).frame(width: 340, height: 42)
+                    .background(Rectangle().fill(Color.white.opacity(0.08))).overlay(Rectangle().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                }
+                .buttonStyle(TuiPress())
                 settingRow("arrow.triangle.2.circlepath", "Flip faces", "Toggle if the world looks inside-out", MXRenderer.flipWinding) { MXRenderer.flipWinding.toggle(); UserDefaults.standard.set(MXRenderer.flipWinding, forKey: "ms.mx.flip") }
                 Button { engine.paused = false; engine.last = nil } label: {
                     HStack(spacing: 8) {

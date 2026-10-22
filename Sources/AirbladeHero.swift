@@ -16,7 +16,19 @@ struct AirbladeHero: View {
     }
 }
 
+/// Drag / pinch state shared between SwiftUI gestures and a 3D view's render loop (read every frame).
+final class ABOrbit {
+    var yaw: Float = 0
+    var pitch: Float = 0
+    var zoom: Float = 1          // 1 = default framing, up to ~2.4 close-up
+    var touched = false          // stops the idle turn while the player is handling it
+    var spin: Float = 0          // one-off intro spin (radians left), eases out
+}
+
 struct HeroModelView: UIViewRepresentable {
+    /// set for the inspection screen: yaw / zoom come from the player's drag and pinch
+    var orbit: ABOrbit? = nil
+
     static var url: URL? {
         Bundle.main.url(forResource: "airblade_hero", withExtension: "glb")
             ?? Bundle.main.url(forResource: "airblade_hero", withExtension: "glb", subdirectory: "models")
@@ -27,6 +39,8 @@ struct HeroModelView: UIViewRepresentable {
         var nodes: [String: MXNode] = [:]
         var root = MXNode()
         var cloth: HeroCloth? = nil
+        var cam = MXNode()
+        var lastYaw: Float = 0
     }
 
     func makeCoordinator() -> Coord { Coord() }
@@ -53,6 +67,7 @@ struct HeroModelView: UIViewRepresentable {
         sc.rootNode.addChildNode(cam)
         v.pointOfView = cam
         cam.look(at: MXVector3(0, 0.86, 0))
+        context.coordinator.cam = cam
 
         let amb = MXNode()
         amb.light = MXLight()
@@ -73,13 +88,28 @@ struct HeroModelView: UIViewRepresentable {
             Self.collect(model, &co.nodes)
             co.cloth = HeroCloth(co.nodes)
         }
+        let orbit = self.orbit
         v.preRender = { [weak co] t in
             guard let co = co else { return }
             let tt = Float(t)
-            let yaw = 0.24 * sin(tt * 0.5)
-            let yawVel = 0.24 * 0.5 * cos(tt * 0.5)
-            co.root.eulerAngles = MXVector3(0, yaw, 0)
-            co.cloth?.update(t: tt, run: 0, yawVel: yawVel)
+            if let o = orbit {
+                // inspection: the player's yaw, a slow idle turn when untouched, zoom toward the chest / face
+                if !o.touched { o.yaw += 0.0035 }
+                let yaw = o.yaw + 0.06 * sin(tt * 0.5)
+                let yawVel = (yaw - co.lastYaw) * 60
+                co.lastYaw = yaw
+                co.root.eulerAngles = MXVector3(0, yaw, 0)
+                co.cloth?.update(t: tt, run: 0, yawVel: max(-3, min(3, yawVel)))
+                let z = max(0.0, min(1.0, (o.zoom - 1) / 1.4))
+                let lookY: Float = 0.86 + 0.5 * z
+                co.cam.position = MXVector3(0, 0.92 + 0.5 * z, 3.5 - 2.2 * z)
+                co.cam.look(at: MXVector3(0, lookY, 0))
+            } else {
+                let yaw = 0.24 * sin(tt * 0.5)
+                let yawVel = 0.24 * 0.5 * cos(tt * 0.5)
+                co.root.eulerAngles = MXVector3(0, yaw, 0)
+                co.cloth?.update(t: tt, run: 0, yawVel: yawVel)
+            }
         }
         return v
     }

@@ -12,6 +12,7 @@ struct LobbyView: View {
     @State private var diff = 1
     @State private var seasonTab = 0
     @State private var username = TacProfile.name
+    @State private var created = TacProfile.created
     @State private var screen = 0          // 0 home, 1 game mode, 2 battle search, 3 map loading
     @State private var searchT = 0
     @State private var loadP: CGFloat = 0
@@ -30,7 +31,15 @@ struct LobbyView: View {
         GeometryReader { g in
             let t = game.s.ex.tac ?? TacData()
             ZStack {
-                BodycamBackdrop()
+                HideoutBackdrop()
+                if !created {
+                    CharacterCreateView {
+                        username = TacProfile.name
+                        screen = 0
+                        withAnimation(.easeOut(duration: 0.25)) { created = true }
+                    }
+                    .transition(.opacity)
+                } else {
                 Group {
                     switch screen {
                     case 1: modeScreen(t, g.size)
@@ -54,6 +63,7 @@ struct LobbyView: View {
                     }
                 }
                 .transition(.opacity)
+                }
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
@@ -106,7 +116,7 @@ struct LobbyView: View {
     }
 
     private func startLoading() {
-        TMap.load([5, 6, 7].contains(nav.tacMap) ? nav.tacMap : 7)
+        TMap.load(TacLobbyMaps.ids.contains(nav.tacMap) ? nav.tacMap : TacLobbyMaps.fallback)
         mapImg = TacRadar.image(1)
         loadP = 0
         screen = 3
@@ -294,9 +304,9 @@ struct LobbyView: View {
                 FrontClassPicker().position(x: W / 2, y: H - 80)
             } else if nav.tacMode != 6 {
                 HStack(spacing: 8) {
-                    ForEach([6], id: \.self) { k in
+                    ForEach(TacLobbyMaps.ids, id: \.self) { k in
                         Button { nav.tacMap = k } label: {
-                            Text(TMap.mapNames[k]).font(.jk(11, .heavy)).foregroundColor(nav.tacMap == k ? .black : .white.opacity(0.85))
+                            Text(TacLobbyMaps.title(k)).font(.jk(11, .heavy)).foregroundColor(nav.tacMap == k ? .black : .white.opacity(0.85))
                                 .padding(.horizontal, 12).frame(height: 28)
                                 .background(Rectangle().fill(nav.tacMap == k ? CS.gold : Color.white.opacity(0.12)))
                         }
@@ -305,7 +315,7 @@ struct LobbyView: View {
                 }
                 .position(x: W / 2, y: H - 80)
             } else {
-                Text("MAP: WAREHOUSE YARD").font(.jk(11, .heavy)).foregroundColor(CS.gold).position(x: W / 2, y: H - 80)
+                Text("MAP: HARBOR COMPLEX").font(.jk(11, .heavy)).foregroundColor(CS.gold).position(x: W / 2, y: H - 80)
             }
             CSButton(title: "CREATE SQUAD", w: 180, h: 40, size: 16) { showAdmin = true }.position(x: 100, y: H - 30)
             CSButton(title: "PLAY", col: CS.orange, dark: CS.orangeDark, w: 180, h: 42, size: 26) { searchT = 0; screen = 2 }
@@ -317,28 +327,6 @@ struct LobbyView: View {
     // MARK: battle search
 
     private func mono(_ n: CGFloat, _ w: Font.Weight = .bold) -> Font { .system(size: n, weight: w, design: .monospaced) }
-
-    private func recDot(_ label: String) -> some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { tl in
-            let on = Int(tl.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
-            HStack(spacing: 6) {
-                Circle().fill(Color(red: 0.95, green: 0.1, blue: 0.1)).frame(width: 9, height: 9).opacity(on ? 1 : 0.25)
-                Text(label).font(mono(12)).foregroundColor(.white)
-            }
-        }
-    }
-
-    private static let stampFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd  HH:mm:ss"
-        return f
-    }()
-
-    private func stamp() -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { tl in
-            Text(Self.stampFmt.string(from: tl.date)).font(mono(10, .regular)).foregroundColor(.white.opacity(0.75))
-        }
-    }
 
     private func lsBar(_ frac: CGFloat, _ col: Color, h: CGFloat = 5) -> some View {
         GeometryReader { g in
@@ -372,19 +360,6 @@ struct LobbyView: View {
             AvatarSoldierPreview(style: TacAvatar.style(TacAvatar.myKey), rank: ri, gun: nav.tacGun)
                 .frame(width: W * 0.4, height: H * 0.92).position(x: W * 0.5, y: H * 0.58).allowsHitTesting(false)
             LinearGradient(colors: [Color.black.opacity(0.55), .clear, Color.black.opacity(0.6)], startPoint: .top, endPoint: .bottom).allowsHitTesting(false)
-            // frame corners like a viewfinder
-            ForEach(0..<4, id: \.self) { i in
-                Path { p in
-                    let x: CGFloat = i % 2 == 0 ? 12 : W - 12, y: CGFloat = i < 2 ? 12 : H - 12
-                    let dx: CGFloat = i % 2 == 0 ? 18 : -18, dy: CGFloat = i < 2 ? 18 : -18
-                    p.move(to: CGPoint(x: x + dx, y: y)); p.addLine(to: CGPoint(x: x, y: y)); p.addLine(to: CGPoint(x: x, y: y + dy))
-                }
-                .stroke(Color.white.opacity(0.7), lineWidth: 1.5)
-            }
-            .allowsHitTesting(false)
-            recDot("SEARCH").position(x: 56, y: 28)
-            stamp().position(x: 120, y: 46)
-            Text("NET  AMERICAS-37").font(mono(10)).foregroundColor(LS.green).position(x: W - 84, y: 28)
             // search status
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
@@ -450,32 +425,20 @@ struct LobbyView: View {
         let woods = nav.tacMode == 6
         let m = nav.tacMode
         let tips = ["Pistols are very useful weapons that can save you from a lot of trouble.", "Walls and props can be shot apart. Break cover to flush enemies out.", "Doors can be closed to slow pushes and hide sound.", "Loot the yard, finish your contract and reach an extraction zone alive. Die and you lose the bag."]
-        let mapTitle = TMap.mapNames[(woods || m == 7) ? 4 : nav.tacMap]
+        let mapTitle = (woods || m == 7) ? TMap.mapNames[4] : TacLobbyMaps.title(nav.tacMap)
         return ZStack {
             VStack(spacing: 8) {
                 HStack(spacing: 10) {
-                    recDot("SEARCH")
+                    Text("LOADING").font(mono(12)).foregroundColor(.white)
                     Text("TIP").font(mono(10)).foregroundColor(LS.orange)
                     Text(m == 6 ? tips[3] : tips[Int(loadP * 3) % 3]).font(.jk(12, .medium)).foregroundColor(.white.opacity(0.92)).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
-                    stamp()
                 }
                 .padding(.horizontal, 12).frame(height: 38).background(Color.black.opacity(0.88)).overlay(Rectangle().stroke(LS.line, lineWidth: 1))
                 HStack(alignment: .top, spacing: 14) {
                     ZStack {
                         Color.black
                         if let im = mapImg { Image(uiImage: im).resizable().scaledToFit().padding(10).opacity(0.92) }
-                        // viewfinder brackets over the map plan
-                        ForEach(0..<4, id: \.self) { i in
-                            GeometryReader { g in
-                                Path { p in
-                                    let x: CGFloat = i % 2 == 0 ? 6 : g.size.width - 6, y: CGFloat = i < 2 ? 6 : g.size.height - 6
-                                    let dx: CGFloat = i % 2 == 0 ? 16 : -16, dy: CGFloat = i < 2 ? 16 : -16
-                                    p.move(to: CGPoint(x: x + dx, y: y)); p.addLine(to: CGPoint(x: x, y: y)); p.addLine(to: CGPoint(x: x, y: y + dy))
-                                }
-                                .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
-                            }
-                        }
                     }
                     .frame(width: W * 0.4, height: H * 0.55)
                     .overlay(Rectangle().stroke(LS.line, lineWidth: 1))
@@ -547,6 +510,17 @@ struct LobbyView: View {
                     Text("Reset stats").font(.jk(15, .bold))
                 }
                 .foregroundColor(.red).frame(maxWidth: .infinity).frame(height: 48).background(Color.red.opacity(0.15)).clipShape(Capsule())
+            }
+            Button {
+                TacProfile.reset()
+                showStats = false
+                withAnimation(.easeOut(duration: 0.25)) { created = false }
+            } label: {
+                HStack(spacing: 8) {
+                    SF("person.crop.circle.badge.plus").font(.system(size: 14, weight: .bold))
+                    Text("New character").font(.jk(15, .bold))
+                }
+                .foregroundColor(.white).frame(maxWidth: .infinity).frame(height: 48).background(Color.white.opacity(0.12)).clipShape(Capsule())
             }
             Spacer()
         }

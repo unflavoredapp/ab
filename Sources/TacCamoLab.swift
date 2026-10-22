@@ -458,7 +458,7 @@ struct CamoLabView: View {
         GeometryReader { g in
             let W = g.size.width, H = g.size.height
             ZStack {
-                BodycamBackdrop()
+                HideoutBackdrop()
                 // header
                 HStack(spacing: 8) {
                     Button { clearPreview(); back() } label: {

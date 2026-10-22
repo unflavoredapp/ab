@@ -112,8 +112,57 @@ enum TacProfile {
     }
 
     static func set(_ raw: String) {
-        let c = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(14))
+        let c = cleanName(raw)
         if !c.isEmpty { UserDefaults.standard.set(c, forKey: key) }
+    }
+
+    // MARK: character creation
+
+    private static let createdKey = "ab.char.created.v1"
+    private static let genderKey = "ab.char.gender.v1"
+    static let genderNames = ["Female", "Male"]
+    static let nameRange = 2...14
+
+    static func cleanName(_ raw: String) -> String {
+        String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(nameRange.upperBound))
+    }
+
+    /// false until the player has made a character; the first launch shows "Create a character"
+    static var created: Bool { UserDefaults.standard.bool(forKey: createdKey) }
+
+    /// 0 female, 1 male
+    static var gender: Int { max(0, min(1, UserDefaults.standard.integer(forKey: genderKey))) }
+
+    /// The look a new character starts with: same base for everyone, tuned to the gender.
+    /// `variant` picks the hair style so the preview and the saved character always agree.
+    static func newLook(gender g: Int, variant v: Int = 0) -> AvatarLook {
+        var l = TacAvatar.full(TacAvatar.myKey, nil)
+        let hair = g == 0 ? [1, 4, 6, 11, 12, 17] : [0, 2, 5, 14, 15, 18]
+        l.hairStyle = hair[abs(v) % hair.count]
+        l.lashes = g == 0
+        l.beard = 0
+        l.build = g == 0 ? 0 : 2
+        l.height = g == 0 ? 1 : 2
+        l.blush = g == 0 ? 1 : 0
+        return l
+    }
+
+    /// Saves the nickname and gender and gives the character a fresh look that fits the gender.
+    static func create(name raw: String, gender g: Int, variant: Int = 0) {
+        let u = UserDefaults.standard
+        let gg = max(0, min(1, g))
+        u.set(cleanName(raw), forKey: key)
+        u.set(gg, forKey: genderKey)
+        u.set(true, forKey: createdKey)
+        AvatarLooks.save(newLook(gender: gg, variant: variant), handle: TacAvatar.myKey)
+    }
+
+    /// Back to the "Create a character" screen (stats stay as they are).
+    static func reset() {
+        let u = UserDefaults.standard
+        u.removeObject(forKey: createdKey)
+        u.removeObject(forKey: genderKey)
+        AvatarLooks.save(nil, handle: TacAvatar.myKey)
     }
 }
 

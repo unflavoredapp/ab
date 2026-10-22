@@ -204,7 +204,7 @@ enum TWarehouse {
     }
 }
 
-// MARK: - Desert Outpost (kind 3): 0 cellar, 1 village, 2 rooftop
+// MARK: - Town Outpost (kind 3): 0 cellar, 1 village, 2 rooftop
 
 enum TDesert {
     static let shared: MapData = build()
@@ -216,8 +216,8 @@ enum TDesert {
         b.area(2, "Rooftop", rc(1150, 175, 500, 300), 5)
         let arena = rc(150, 100, 2700, 1600)
         b.setR(1, arena, true)
-        b.tiles.insert(TRoom(name: "Desert", r: MapBuilder.R(1, arena), mat: 0, fl: 1), at: 0)
-        b.rooms.append(TRoom(name: "Dune Road", r: MapBuilder.R(1, rc(150, 100, 2700, 800)), mat: 0, fl: 1))
+        b.tiles.insert(TRoom(name: "Streets", r: MapBuilder.R(1, arena), mat: 8, fl: 1), at: 0)
+        b.rooms.append(TRoom(name: "Main Street", r: MapBuilder.R(1, rc(150, 100, 2700, 800)), mat: 0, fl: 1))
         b.rooms.append(TRoom(name: "Old Square", r: MapBuilder.R(1, rc(150, 900, 2700, 800)), mat: 0, fl: 1))
         b.building(1, "Market", rc(300, 200, 500, 400), doors: [("S", 200)], mat: 3)
         b.building(1, "Hall", rc(1100, 150, 600, 350), doors: [("S", 250), ("W", 120)], mat: 5)
@@ -239,10 +239,10 @@ enum TDesert {
         b.p(1, .table, 2350, 1250, 120, 70); b.p(1, .crate, 2600, 1480, 60, 60); b.p(1, .couch, 2300, 1480, 160, 60)
         // outdoor cover
         b.p(1, .sandbag, 900, 700, 120, 32); b.p(1, .sandbag, 1000, 740, 32, 100); b.p(1, .crate, 1300, 700, 70, 70); b.p(1, .barrel, 1700, 650, 36, 36)
-        b.p(1, .car, 820, 1000, 110, 56); b.p(1, .rock, 500, 800, 90, 70); b.p(1, .rock, 2100, 850, 100, 80)
-        b.p(1, .sandbag, 1500, 900, 150, 32); b.p(1, .crate, 1450, 1050, 90, 90); b.p(1, .rock, 1000, 1000, 80, 60)
-        b.p(1, .car, 2000, 1000, 56, 110); b.p(1, .sandbag, 2350, 800, 120, 32); b.p(1, .rock, 900, 1550, 110, 80)
-        b.p(1, .crate, 780, 700, 60, 60); b.p(1, .barrel, 2700, 820, 36, 36); b.p(1, .rock, 2600, 950, 90, 90)
+        b.p(1, .car, 820, 1000, 110, 56); b.p(1, .crate, 500, 800, 90, 70); b.p(1, .crate, 2100, 850, 100, 80)
+        b.p(1, .sandbag, 1500, 900, 150, 32); b.p(1, .crate, 1450, 1050, 90, 90); b.p(1, .crate, 1000, 1000, 80, 60)
+        b.p(1, .car, 2000, 1000, 56, 110); b.p(1, .sandbag, 2350, 800, 120, 32); b.p(1, .crate, 900, 1550, 110, 80)
+        b.p(1, .crate, 780, 700, 60, 60); b.p(1, .barrel, 2700, 820, 36, 36); b.p(1, .crate, 2600, 950, 90, 90)
         b.p(1, .sandbag, 2100, 700, 32, 120); b.p(1, .crate, 700, 900, 70, 70)
         b.p(0, .crate, 1500, 1280, 60, 60); b.p(0, .barrel, 1700, 1500, 36, 36)
         b.p(2, .crate, 1400, 250, 60, 60); b.p(2, .sandbag, 1500, 400, 100, 30)
@@ -256,7 +256,7 @@ enum TDesert {
         var md = MapData(rooms: b.rooms, floorTiles: b.tiles, layout: layout, props: b.props, packPos: packs, stairs: stairs, stairLo: stairLo,
                          siteA: MapBuilder.R(1, rc(400, 300, 300, 200)), siteB: MapBuilder.R(1, rc(2400, 1250, 300, 250)),
                          atkSpawn: atk, defSpawn: def, hubZone: MapBuilder.R(1, rc(1300, 700, 400, 200)),
-                         floorNames: ["CELLAR", "OUTPOST", "ROOFTOP"], loot: [], roofs: b.roofs, spawns: spawns)
+                         floorNames: ["CELLAR", "TOWN", "ROOFTOP"], loot: [], roofs: b.roofs, spawns: spawns)
         md.siteNames = ["A · MARKET", "B · TOWER HOUSE"]
         return md
     }

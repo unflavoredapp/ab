@@ -890,7 +890,7 @@ final class MXRenderer {
             ce.setFragmentTexture(hdr, index: 0)
             ce.setFragmentTexture(bloomTex, index: 1)
             post0[0] = SIMD4<Float>(bloomOn ? Float(camera.bloomIntensity) : 0, Float(camera.saturation == 0 ? 1 : camera.saturation), Float(camera.contrast), camera.wantsHDR ? 1 : 0)
-            post0[1] = SIMD4<Float>(Float(camera.vignettingIntensity), Float(max(0.1, camera.vignettingPower)), Float(max(0.05, camera.exposure)), Float(camera.bodycam))
+            post0[1] = SIMD4<Float>(Float(camera.vignettingIntensity), Float(max(0.1, camera.vignettingPower)), Float(max(0.05, camera.exposure)), 0)
             post0[3] = SIMD4<Float>(Float(camera.lensDirt), 0, 0, 0)
             post0[2] = SIMD4<Float>(camera.camTime, Float(target.width) / Float(max(1, target.height)), Float(target.width), Float(target.height))
             ce.setFragmentBytes(post0, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)

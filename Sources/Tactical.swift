@@ -308,6 +308,8 @@ final class TPlayer {
     var flash: CGFloat = 0
     var hurt: CGFloat = 0
     var kills = 0
+    var deaths = 0
+    var dmgDealt: CGFloat = 0
     var path: [CGPoint] = []
     var pathT: CGFloat = 0
     var pathDest = CGPoint.zero
@@ -1245,8 +1247,7 @@ final class TacticalEngine {
         }
         var vs = TMove.State(z: pz, vz: pvz, wallRunT: wallRunT, wallLock: wallLock, wallGrace: wallGrace, wallN: wallN)
         let vr = TMove.step(&vs, dt: dt, jump: wantJump, move: mv, aim: p.aim, baseSpeed: sp) { a in
-            let dist = TMap.rayDist(p.pos, a, TMove.wallProbe)
-            return (dist: dist, top: TMap.wallH)
+            TMap.rayHit(p.pos, a, TMove.wallProbe)
         }
         wantJump = false
         pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN
@@ -1362,7 +1363,7 @@ final class TacticalEngine {
         let rMul = am.recoilMul * gm.rec
         if p.isPlayer {
             sprd += recoil * 0.045 * rMul + (moving ? 0.03 : 0) + (p.crouch ? -0.004 : 0)
-            if scoped { sprd *= 0.35 * am.scopeMul } else if ads { sprd *= 0.5 } else if TBody.on { sprd *= TBody.hipSpread }
+            if scoped { sprd *= 0.35 * am.scopeMul } else if ads { sprd *= 0.5 } else { sprd *= ABRules.hipSpread }
             sprd = max(0.002, sprd)
             p.aim += CGFloat.random(in: -0.0035...0.0035) * (0.4 + recoil)
             recoil = min(1.2, recoil + 0.13 * rMul)
@@ -1406,12 +1407,13 @@ final class TacticalEngine {
 
     func damage(_ victim: TPlayer, _ amt: CGFloat, by owner: Int) {
         guard victim.alive else { return }
-        var amt = TBody.on && owner > -2 ? amt * TBody.dmgMul : amt
+        var amt = owner > -2 ? amt * ABRules.dmgMul : amt
         if victim.armor > 0 && owner > -2 {
             let ratio: CGFloat = victim.armorKind >= 3 ? 0.75 : (victim.armorKind == 2 ? 0.6 : 0.5)
             let red: CGFloat = victim.armorKind >= 3 ? 0.9 : (victim.armorKind == 2 ? 0.85 : 0.8)
             let ab = min(victim.armor, amt * ratio); victim.armor -= ab; amt -= ab * red
         }
+        if let o = players.first(where: { $0.id == owner }), o.team != victim.team { o.dmgDealt += min(max(0, victim.hp), amt) }
         victim.hp -= victim.crouch ? amt * 0.7 : amt
         victim.hurt = 0.25
         if owner > -2 && impacts.count < 48 { impacts.append(Impact(pos: victim.pos, nx: 0, ny: 0, kind: 1)) }
@@ -1424,6 +1426,7 @@ final class TacticalEngine {
         if victim.hp <= 0 {
             victim.hp = 0
             victim.alive = false
+            victim.deaths += 1
             if impacts.count < 48 { impacts.append(Impact(pos: victim.pos, nx: 0, ny: 0, kind: 3)) }
             let killer = players.first { $0.id == owner }
             if victim.isPlayer {
@@ -1897,7 +1900,7 @@ final class TacticalEngine {
 
     /// First-person radar: baked map image rotated heading-up inside a circle, live markers on top.
     private func drawRadar(_ ctx: inout GraphicsContext) {
-        if TBody.on { return }
+        if ABRules.radarOff { return }
         let focus: TPlayer = me.alive ? me : (players.first { $0.team == me.team && $0.alive } ?? me)
         let cx: CGFloat = 84, cy: CGFloat = 128, R: CGFloat = 64
         let s: CGFloat = 0.12
@@ -2770,29 +2773,8 @@ struct TacticalPlay: View {
             GeometryReader { geo in
                 let W = geo.size.width, H = geo.size.height
                 ZStack(alignment: .topLeading) {
-                    BodycamHud(e: e)
-                    // Floating match strip; tapping it opens the full AIRBLADE scoreboard.
-                    Button { showScoreboard.toggle() } label: {
-                        HStack(spacing: 12) {
-                            VStack(spacing: 1) {
-                                Text(TBody.mmss(Double(max(0, e.timer))))
-                                    .font(.system(size: 16, weight: .black, design: .monospaced)).monospacedDigit()
-                                Text("MATCH TIME").font(.system(size: 7, weight: .black, design: .monospaced)).tracking(1).foregroundColor(.white.opacity(0.55))
-                            }
-                            Rectangle().fill(Color.white.opacity(0.18)).frame(width: 1, height: 26)
-                            VStack(spacing: 1) {
-                                Text("\(e.me.kills)").font(.system(size: 17, weight: .black, design: .monospaced)).foregroundColor(Color(red: 0.18, green: 0.75, blue: 1))
-                                Text("KILLS").font(.system(size: 7, weight: .black, design: .monospaced)).tracking(1).foregroundColor(.white.opacity(0.55))
-                            }
-                            Image(systemName: "list.bullet.rectangle.portrait").font(.system(size: 13, weight: .bold)).foregroundColor(.white.opacity(0.8))
-                        }
-                        .foregroundColor(.white).padding(.horizontal, 13).padding(.vertical, 6)
-                        .background(Color.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(Color.white.opacity(0.17), lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .position(x: W * 0.5, y: 31)
-                    // top-left: settings; the radar is drawn by the canvas
+                    AirbladeHud(e: e) { showScoreboard.toggle() }
+                    // top-right: settings
                     Button { e.paused = true } label: { vbtn("gearshape.fill", 34) }
                         .buttonStyle(TuiPress())
                         .position(x: W - 34, y: 28)
@@ -2817,7 +2799,7 @@ struct TacticalPlay: View {
                             .buttonStyle(TuiPress()).position(x: W - 92, y: H - 44)
                         Button { e.wantReload = true } label: { vbtn("arrow.triangle.2.circlepath", 48) }
                             .buttonStyle(TuiPress()).position(x: W - 214, y: H - 40)
-                        BodycamAmmo(e: e).position(x: W - 122, y: H - 40)
+                        AirbladeWeaponBox(e: e).position(x: W * 0.5, y: H - 36)
                     } else {
                         Button { e.fast.toggle() } label: {
                             HStack(spacing: 6) {
@@ -2883,7 +2865,7 @@ struct TacticalPlay: View {
                 if engine.paused && !engine.over { pauseView }
                 if engine.over { overView }
                 if !engine.me.alive && !engine.over && !engine.paused {
-                    BodycamDown(e: engine) { showLoadout = true; engine.paused = true }
+                    AirbladeDown(e: engine) { showLoadout = true; engine.paused = true }
                 }
                 if engine.gameMode == 6 && !engine.over && engine.me.alive { RaidFX(e: engine) }
                 if engine.raidBagOpen && engine.gameMode == 6 && engine.me.alive && !engine.over { RaidBagPanel(e: engine) }

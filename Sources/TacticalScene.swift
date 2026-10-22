@@ -437,8 +437,8 @@ final class TacScene {
         }
         scene.background.contents = skyImg
         scene.fogColor = fogC
-        scene.fogStartDistance = fpMode ? (TMap.look == 1 ? 400 : (TMap.look >= 2 ? 700 : 650)) : 1400
-        scene.fogEndDistance = fpMode ? (TMap.look == 1 ? 1800 : (TMap.look >= 2 ? 2500 : 2300)) : 4200
+        scene.fogStartDistance = fpMode ? (TMap.look == 1 ? 800 : (TMap.look >= 2 ? 1600 : 650)) : 1400
+        scene.fogEndDistance = fpMode ? (TMap.look == 1 ? 2400 : (TMap.look >= 2 ? 4800 : 2300)) : 4200
         scene.fogDensityExponent = 1.4
         let root = scene.rootNode
         lamps = []
@@ -606,7 +606,7 @@ final class TacScene {
             let ffl = TMap.floorOfX(rm.r.midX)
             for pc in carve(rm.r, stairHoles(ffl, upper: true)) {
                 let top = mat(img, sx: pc.width / tile, sy: pc.height / tile)
-                let n = box(pc, h: 1, y0: ["Woods", "Yard", "Desert", "Harbor"].contains(rm.name) ? -2 : (rm.name == "Water" ? -6 : (rm.name == "Ground" ? -1.5 : -1)), mats: [side, side, side, side, top, side])
+                let n = box(pc, h: 1, y0: ["Woods", "Yard", "Desert", "Streets", "Harbor"].contains(rm.name) ? -2 : (rm.name == "Water" ? -6 : (rm.name == "Ground" ? -1.5 : -1)), mats: [side, side, side, side, top, side])
                 fr(pc.midX).addChildNode(n)
             }
         }
@@ -1359,7 +1359,7 @@ final class TacScene {
     }
 
     private func updateCull(_ ex: CGFloat, _ ez: CGFloat, _ fx: CGFloat, _ fz: CGFloat) {
-        let range: CGFloat = 1800
+        let range: CGFloat = TMap.look >= 2 ? 3400 : 1800
         for it in cull {
             let vx = it.c.x - ex, vz = it.c.y - ez
             let d = max(1, hypot(vx, vz))
@@ -1473,24 +1473,16 @@ final class TacScene {
         let jz: CGFloat = sh > 0 ? CGFloat.random(in: -sh...sh) * 0.6 : 0
         for c in ceilNodes { c.isHidden = true }
         if fpMode {
-            if !TBody.tps && focusFloor < ceilNodes.count && (TMap.look == 0 || focusFloor == 0) { ceilNodes[focusFloor].isHidden = false }
             let ex = fx, ez = focus.pos.y
             let dxv = cos(focus.aim), dzv = sin(focus.aim)
-            let eh = CGFloat(TMap.eyeH) + (TBody.tps ? e.pz * 0.9 : CGFloat(sin(Double(min(1, e.jumpT / 0.55)) * Double.pi)) * 22) + (sh > 0 ? CGFloat.random(in: -sh...sh) * 0.25 : 0)
+            let eh = CGFloat(TMap.eyeH) + e.pz * 0.9 + (sh > 0 ? CGFloat.random(in: -sh...sh) * 0.25 : 0)
             fpFwd = CGPoint(x: dxv, y: dzv)
             fpEye = CGPoint(x: ex, y: ez)
             if !cullBuilt { cullBuilt = true; registerCull() }
             if abs(e.time - lastCull) > 0.1 { lastCull = e.time; updateCull(ex, ez, dxv, dzv) }
-            camNode.camera?.zNear = 0.6
-            camNode.camera?.zFar = 2200
-            vm.show(focus.knife ? "knife" : TWeapons.model(focus.gun))
-            vm.root.isHidden = TBody.tps || !(focus.alive && !e.scoped)
-            let gw = TWeapons.w(focus.gun)
-            let rprog: Float? = focus.reloadT > 0 ? Float(max(0, min(1, 1 - focus.reloadT / max(0.1, gw.reload)))) : nil
-            let vdt = Float(max(0.001, min(0.05, e.time - lastVmT)))
-            lastVmT = e.time
-            vm.update(dt: vdt, t: Float(e.time), move: e.replayOn ? 0.6 : Float(min(1, hypot(e.move.dx, e.move.dy))), kick: e.replayOn ? (focus.flash > 0 ? 6 : 0) : Float(e.kick), reload: rprog, flashing: focus.flash > 0, recoilScale: TWeapons.recoil(focus.gun), ads: (e.ads && !e.replayOn) ? 1 : 0)
-            vm.flash(focus.flash > 0)
+            camNode.camera?.zNear = 2
+            camNode.camera?.zFar = TMap.look >= 2 ? 5200 : 2600
+            vm.root.isHidden = true
             // the muzzle lights the room for the length of the flash
             if muzzleLight == nil {
                 let ln = MXNode()
@@ -1511,35 +1503,21 @@ final class TacScene {
                 if on { ln.light?.intensity = CGFloat.random(in: 650...1250) }
                 ln.isHidden = !on
             }
-            camNode.camera?.fieldOfView += ((TBody.tps ? TBody.tpsFov : e.scoped ? TAtt.mods(e.me.gun).zoomFOV : (e.ads ? TBody.fov * 0.78 : TBody.fov)) - (camNode.camera?.fieldOfView ?? TBody.fov)) * 0.3
-            // bodycam: strapped to the chest, so it breathes, rolls with every step and lags the aim
-            let bt = Double(e.time)
-            let mv = CGFloat(min(1, hypot(e.move.dx, e.move.dy)))
-            let calm: CGFloat = e.scoped ? 0.25 : (e.ads ? 0.5 : 1)
-            let swayX = CGFloat(sin(bt * 1.35) * 0.45 + sin(bt * 0.57) * 0.6 + sin(bt * 4.1) * 0.12) * (1 + 2.2 * mv) * calm
-            let swayY = CGFloat(sin(bt * 2.05) * 0.3 + abs(sin(bt * 6.2)) * 0.9 * Double(mv)) * calm
-            camNode.camera?.bodycam = TBody.tps ? 0 : (e.scoped ? 0.55 : 1)
-            camNode.camera?.camTime = Float(bt)
-            camNode.camera?.saturation = TBody.tps ? 1.1 : 0.78
+            camNode.camera?.fieldOfView += (ABRules.camFov - (camNode.camera?.fieldOfView ?? ABRules.camFov)) * 0.3
+            camNode.camera?.saturation = 1.1
             camNode.camera?.contrast = 0.12
-            camNode.camera?.vignettingIntensity = TBody.tps ? 0.3 : 0.55
-            camNode.camera?.vignettingPower = TBody.tps ? 1.6 : 2.0
-            if TBody.tps {
-                // chase camera: behind and a little above, pulled in when a wall is in the way
-                let back = max(20, min(TBody.tpsDist, TMap.rayDist(focus.pos, focus.aim + CGFloat.pi, TBody.tpsDist + 14) - 14))
-                let side: CGFloat = 11
-                camNode.position = MXVector3(Float(ex - dxv * back - dzv * side + jx * 0.3), Float(eh + 26), Float(ez - dzv * back + dxv * side + jz * 0.3))
-                camNode.look(at: MXVector3(Float(ex + dxv * 240), Float(eh + 6 + tan(e.pitch) * 240), Float(ez + dzv * 240)))
-            } else {
-                camNode.position = MXVector3(Float(ex + jx * 0.3), Float(eh + swayY * 0.9), Float(ez + jz * 0.3))
-                camNode.look(at: MXVector3(Float(ex + dxv * 100 - dzv * swayX), Float(eh + swayY * 1.4 + tan(e.pitch) * 100), Float(ez + dzv * 100 + dxv * swayX)))
-            }
+            camNode.camera?.vignettingIntensity = 0.3
+            camNode.camera?.vignettingPower = 1.6
+            // chase camera: behind and a little above, pulled in when a wall is in the way
+            let back = max(20, min(ABRules.camDist, TMap.rayDist(focus.pos, focus.aim + CGFloat.pi, ABRules.camDist + 14) - 14))
+            let side: CGFloat = 11
+            camNode.position = MXVector3(Float(ex - dxv * back - dzv * side + jx * 0.3), Float(eh + 26), Float(ez - dzv * back + dxv * side + jz * 0.3))
+            camNode.look(at: MXVector3(Float(ex + dxv * 240), Float(eh + 6 + tan(e.pitch) * 240), Float(ez + dzv * 240)))
         } else {
             vm.root.isHidden = true
             camNode.camera?.zNear = 10
             camNode.camera?.zFar = 3000
             camNode.camera?.fieldOfView = 52
-            camNode.camera?.bodycam = 0
             let pr: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [(300, 170, 60, 30), (400, 250, 70, 40), (520, 70, 70, 50), (640, 400, 90, 60)]
             let c = pr[max(0, min(3, preset))]
             // always the same top-down pitch; yaw just spins the view around the player
@@ -1551,7 +1529,7 @@ final class TacScene {
         for (i, p) in e.players.enumerated() {
             let rt = roots[i]
             let show = (e.replayOn || p.team == e.me.team || p.spotted || (!p.alive && p.seenEver)) && (TMap.floorOf(p.pos) == focusFloor || (fpMode && linkedFloors.contains(TMap.floorOf(p.pos)) && TMap.crossLink(focus.pos, p.pos)))
-            rt.isHidden = !show || (fpMode && !TBody.tps && p.id == focus.id)
+            rt.isHidden = !show
             if !show { continue }
             let ks: Float = fpMode ? 1.18 : 1
             rt.scale = MXVector3(ks, ks * (p.crouch ? 0.74 : 1), ks)

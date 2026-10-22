@@ -19,7 +19,7 @@ func SF(_ name: String, _ fallback: String = "circle.fill") -> Image {
 }
 
 extension View {
-    /// gunmetal bodycam panel: square, hairline edge, viewfinder corners (radius kept for call-site compatibility)
+    /// gunmetal panel: square, hairline edge (radius kept for call-site compatibility)
     func tuiGlass(_ radius: CGFloat = 12, fill: Double = 0.5) -> some View {
         self
             .background(Rectangle().fill(Color(red: 0.05, green: 0.055, blue: 0.06).opacity(0.55 + fill * 0.4)))

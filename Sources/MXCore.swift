@@ -526,8 +526,7 @@ final class MXCamera {
     var screenSpaceAmbientOcclusionRadius: CGFloat = 0
     var saturation: CGFloat = 1
     var contrast: CGFloat = 0
-    /// bodycam lens strength (0 = off) and animation clock, read by the composite pass
-    var bodycam: CGFloat = 0
+    /// animation clock, read by the composite pass
     var camTime: Float = 0
     /// scene exposure multiplier and lens-dirt strength on the bloom (0 = clean lens)
     var exposure: CGFloat = 1

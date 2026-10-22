@@ -31,7 +31,7 @@ struct LobbyView: View {
         GeometryReader { g in
             let t = game.s.ex.tac ?? TacData()
             ZStack {
-                HideoutBackdrop(hero: !created || screen == 0 || screen == 15, heroX: screen == 15 ? 0.43 : 0.53)
+                HideoutBackdrop(hero: !created || screen == 0, heroX: 0.5)
                 if !created {
                     CharacterCreateView {
                         username = TacProfile.name
@@ -56,8 +56,13 @@ struct LobbyView: View {
                     case 12: custPage(t, g.size)
                     case 14: CamoLabView(back: { screen = 12 })
                     case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; startMatch() })
-                    case 15: InventoryView(t: t, size: g.size, act: homeAct)
+                    case 15: OWInventoryView(t: t, size: g.size, act: homeAct)
+                    case 19: OWMapView(t: t, size: g.size, act: homeAct)
+                    case 20: OWCrewView(t: t, size: g.size, act: homeAct)
+                    case 21: OWShopView(t: t, size: g.size, act: homeAct)
+                    case 22: OWEventsView(t: t, size: g.size, act: homeAct)
                     case 17: HeroInspectView(t: t, size: g.size, act: homeAct)
+                    case 18: AirbladeProgressView(t: t, size: g.size, act: homeAct)
                     case 16: MissionBoardView(t: t, size: g.size, diff: $diff, act: homeAct) { op in
                         nav.tacMode = op.mode
                         nav.tacMap = TacLobbyMaps.fallback
@@ -206,6 +211,10 @@ struct LobbyView: View {
         case .ranks: showRanks = true
         case .stats: showStats = true
         case .loadout: break
+        case .launch(let m):
+            nav.tacMode = m
+            nav.tacMap = TacLobbyMaps.fallback
+            startMatch()
         }
     }
 

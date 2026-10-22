@@ -156,9 +156,18 @@ struct AirbladeHud: View {
             vitals(hp: hp, armor: armor)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 18).padding(.top, 10)
-            strip(me)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, 8)
+            if e.gameMode != 10 {
+                strip(me)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 8)
+            }
+            if e.gameMode == 10 && e.phase != 4 { RoamHUD(e: e) }
+            if e.gameMode == 9 && e.phase != 4 {
+                AirbladeLabHUD(e: e)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 18).padding(.top, 62)
+                    .allowsHitTesting(false)
+            }
             feed(me)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(.top, 10).padding(.trailing, 64)

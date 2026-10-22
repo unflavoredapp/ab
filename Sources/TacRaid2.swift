@@ -224,7 +224,7 @@ extension TacticalEngine {
     }
 
     func raidSight(_ p: TPlayer) -> CGFloat {
-        guard gameMode == 6 else { return 780 }
+        guard gameMode == 6 else { return gameMode == 10 ? 520 : 780 }
         if evKind == 3 { return 340 }
         return p.faction == 2 ? 1100 : 780
     }

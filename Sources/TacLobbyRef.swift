@@ -38,8 +38,9 @@ struct HeroFace: View {
 }
 
 /// HIDEOUT page laid out like the GunZ hideout: a thin top bar, two news cards top-left, the clan card
-/// and QUICK START bottom-left, the character standing on the floor, a small slot bar under her feet.
-/// Every size is in GunZ pixels (1024x576 reference) times `u`.
+/// HIDEOUT page, laid out like the open-world mockup: your turf and the main menu on the left, the hero in
+/// the middle (drawn by the backdrop), war countdown / daily challenges / crew activity on the right,
+/// four mode tiles bottom-left and PLAY NOW bottom-right.
 struct LobbyHome: View {
     @EnvironmentObject var game: Game
     @EnvironmentObject var nav: Nav
@@ -48,340 +49,308 @@ struct LobbyHome: View {
     @Binding var diff: Int
     let act: (LobbyAct) -> Void
 
-    @State private var showChallenges = false
+    @State private var tile = 0          // 0 free roam, 1 contracts, 2 territory war, 3 crew ops
+    @State private var party = 0         // solo / duo / squad (cosmetic until online play exists)
 
     private let blue = Color(red: 0.25, green: 0.65, blue: 1.0)
-    private let discord = Color(red: 0.345, green: 0.396, blue: 0.949)
-
     private let glass = Color(red: 0.04, green: 0.06, blue: 0.11).opacity(0.78)
     private let edge = Color(red: 0.55, green: 0.7, blue: 1).opacity(0.22)
     private var W: CGFloat { size.width }
     private var H: CGFloat { size.height }
     private var u: CGFloat { min(size.width / 1024, size.height / 470) }
 
-    // MARK: top bar
+    private struct Tile { let title: String; let icon: String; let anchor: UnitPoint; let zoom: CGFloat }
+    private let tiles = [
+        Tile(title: "FREE ROAM", icon: "mappin.and.ellipse", anchor: UnitPoint(x: 0.3, y: 0.25), zoom: 2.4),
+        Tile(title: "CONTRACTS", icon: "doc.text.fill", anchor: UnitPoint(x: 0.82, y: 0.4), zoom: 2.6),
+        Tile(title: "TERRITORY WAR", icon: "crown.fill", anchor: UnitPoint(x: 0.5, y: 0.5), zoom: 2.0),
+        Tile(title: "CREW OPS", icon: "person.3.fill", anchor: UnitPoint(x: 0.2, y: 0.8), zoom: 2.4),
+    ]
 
-    private func currency(_ letter: String, _ value: String, _ ring: Color) -> some View {
-        HStack(spacing: 6 * u) {
-            Text(letter).font(.jk(7 * u, .heavy)).foregroundColor(.black.opacity(0.75))
-                .frame(width: 16 * u, height: 16 * u)
-                .background(Circle().fill(ring))
-            Text(value).font(.jk(10.5 * u, .semibold)).foregroundColor(.white).monospacedDigit().fixedSize()
-        }
-        .padding(.horizontal, 9 * u).frame(height: 24 * u)
-        .background(Capsule().fill(glass))
-        .overlay(Capsule().stroke(edge, lineWidth: 1))
-    }
-
-    private func topNav(_ title: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.jk(13 * u, selected ? .heavy : .semibold)).foregroundColor(selected ? .white : .white.opacity(0.62))
-                .padding(.horizontal, 18 * u).frame(height: 40 * u)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(selected ? blue : .clear).frame(height: 2 * u).padding(.horizontal, 10 * u)
-                        .shadow(color: blue.opacity(0.8), radius: 4 * u)
-                }
-        }.buttonStyle(.plain)
-    }
-
-    private func subNav(_ title: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.jk(10.5 * u, selected ? .heavy : .semibold)).foregroundColor(selected ? .white : .white.opacity(0.5))
-                .padding(.horizontal, 14 * u).frame(height: 24 * u)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(selected ? blue : .clear).frame(height: 1.5 * u).padding(.horizontal, 6 * u)
-                }
-        }.buttonStyle(.plain)
-    }
-
-    private func icon(_ name: String, dot: Bool = false, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: name).font(.system(size: 13 * u, weight: .regular)).foregroundColor(.white.opacity(0.7))
-                .frame(width: 30 * u, height: 30 * u)
-                .overlay(alignment: .topTrailing) {
-                    if dot { Circle().fill(Color.red).frame(width: 5 * u, height: 5 * u).offset(x: -6 * u, y: 6 * u) }
-                }
-        }.buttonStyle(.plain)
-    }
-
-    private var profileTile: some View {
-        let xp = TacRank.totalXP(t)
-        let ri = TacRank.index(xp)
-        return Button { act(.ranks) } label: {
-            HStack(spacing: 8 * u) {
-                BladeEmblem().frame(width: 22 * u, height: 25 * u).padding(4 * u)
-                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.22, green: 0.04, blue: 0.06)))
-                VStack(alignment: .leading, spacing: 3 * u) {
-                    Text(TacProfile.name.uppercased()).font(.jk(10.5 * u, .heavy)).italic().foregroundColor(.white).lineLimit(1)
-                    HStack(spacing: 6 * u) {
-                        Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
-                        Spacer(minLength: 0)
-                        Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
-                    }
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.14))
-                        Capsule().fill(blue).frame(width: 100 * u * CGFloat(TacRank.progress(xp)))
-                    }
-                    .frame(width: 100 * u, height: 3.5 * u)
-                }
-                .frame(width: 100 * u, alignment: .leading)
-            }
-            .padding(.horizontal, 8 * u).frame(height: 38 * u)
-            .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
-            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
-        }.buttonStyle(.plain)
-    }
-
-    private var topBar: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                AirbladeLogo(size: 18 * u).padding(.leading, 26 * u).padding(.trailing, 18 * u)
-                topNav("HideOut", selected: true) { act(.nav(0)) }
-                topNav("Play") { act(.screen(1)) }
-                topNav("Shop") { act(.nav(6)) }
-                topNav("Inventory") { act(.screen(15)) }
-                topNav("Event") { act(.season(0)) }
-                Spacer(minLength: 6 * u)
-                HStack(spacing: 22 * u) {
-                    currency("C", game.s.ex.gems.formatted(), Color(red: 1, green: 0.75, blue: 0.22))
-                    currency("ZC", "\(t.rating)", Color(red: 0.4, green: 0.7, blue: 1))
-                }
-                .padding(.trailing, 24 * u)
-                profileTile
-                HStack(spacing: 2 * u) {
-                    icon("person.2.fill") { act(.friends) }
-                    icon("envelope.fill", dot: true) { act(.friends) }
-                    icon("gearshape.fill") { act(.stats) }
-                }
-                .padding(.leading, 10 * u).padding(.trailing, 14 * u)
-            }
-            .frame(height: 44 * u)
-            .background(LinearGradient(colors: [Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.85), Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.25)], startPoint: .top, endPoint: .bottom))
-            .overlay(alignment: .bottom) { Rectangle().fill(edge).frame(height: 1) }
-            HStack(spacing: 0) {
-                subNav("Lobby", selected: true) { act(.nav(0)) }
-                subNav("Record") { act(.stats) }
-                subNav("Achievements") { withAnimation(.easeOut(duration: 0.15)) { showChallenges.toggle() } }
-                Spacer()
-            }
-            .padding(.leading, 98 * u).padding(.top, 4 * u)
-        }
-    }
-
-    // MARK: character
-
-    private var hero: some View {
+    private func art(_ w: CGFloat, _ h: CGFloat, anchor: UnitPoint = .center, zoom: CGFloat = 1) -> some View {
         ZStack {
-            Ellipse()
-                .fill(RadialGradient(colors: [Color.black.opacity(0.6), .clear], center: .center, startRadius: 2, endRadius: W * 0.11))
-                .frame(width: W * 0.22, height: H * 0.07)
-                .position(x: W * 0.53, y: H * 0.945)
-            AirbladeHero()
-                .frame(width: W * 0.42, height: H * 0.95)
-                .position(x: W * 0.53, y: H * 0.545)
+            if let bg = HideoutBackdrop.userBg {
+                Image(uiImage: bg).resizable().scaledToFill().frame(width: w, height: h)
+                    .scaleEffect(zoom, anchor: anchor).clipped()
+            } else {
+                LinearGradient(colors: [Color(red: 0.08, green: 0.12, blue: 0.22), Color(red: 0.03, green: 0.04, blue: 0.08)], startPoint: .top, endPoint: .bottom)
+            }
         }
-        .frame(width: W, height: H)
-        .allowsHitTesting(false)
+        .frame(width: w, height: h).clipped()
     }
 
     // MARK: left column
 
-    private func pageDots(_ on: Int, _ n: Int) -> some View {
-        HStack(spacing: 4 * u) {
-            ForEach(0..<n, id: \.self) { k in
-                Circle().fill(Color.white.opacity(k == on ? 0.9 : 0.3)).frame(width: 4 * u, height: 4 * u)
+    private var turf: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("YOUR TURF").font(.jk(9 * u, .semibold)).tracking(0.5 * u).foregroundColor(.white.opacity(0.75))
+                .padding(.leading, 10 * u).frame(width: 210 * u, height: 17 * u, alignment: .leading).background(glass)
+            ZStack(alignment: .bottomLeading) {
+                art(210 * u, 80 * u, anchor: UnitPoint(x: 0.35, y: 0.2), zoom: 2.2)
+                LinearGradient(colors: [.clear, Color.black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 2 * u) {
+                    Text("RIVERSIDE").font(.jk(17 * u, .heavy)).foregroundColor(.white)
+                    HStack(spacing: 3 * u) {
+                        Image(systemName: "mappin.circle.fill").font(.system(size: 7.5 * u)).foregroundColor(.white)
+                        Text("OWNED BY: YOUR CREW").font(.jk(7.5 * u, .semibold)).foregroundColor(.white.opacity(0.9))
+                    }
+                }
+                .padding(.leading, 9 * u).padding(.bottom, 6 * u)
             }
+            .frame(width: 210 * u, height: 80 * u)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 4 * u))
+        .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
     }
 
-    private var websiteCard: some View {
-        VStack(spacing: 6 * u) {
-            AirbladeLogo(size: 20 * u)
-            HStack(spacing: 5 * u) {
-                Text("Official Website").font(.jk(10.5 * u, .semibold)).foregroundColor(.white.opacity(0.92)).fixedSize()
-                Image(systemName: "arrow.up.right.square").font(.system(size: 9 * u, weight: .semibold)).foregroundColor(.white.opacity(0.85))
-            }
-        }
-        .frame(width: 210 * u, height: 84 * u)
-        .background(glass)
-    }
-
-    private var discordCard: some View {
-        Button { } label: {
-            VStack(spacing: 7 * u) {
-                Image(systemName: "gamecontroller.fill").font(.system(size: 22 * u, weight: .bold))
-                Text("JOIN OFFICIAL DISCORD").font(.jk(15 * u, .heavy)).italic().fixedSize()
-            }
-            .foregroundColor(.white).frame(width: 210 * u, height: 96 * u)
-            .background(discord)
-        }.buttonStyle(.plain)
-    }
-
-    /// website + discord as one rounded panel, like the mockup
-    private var newsPanel: some View {
-        VStack(spacing: 0) {
-            websiteCard
-            discordCard
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 6 * u))
-        .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
-        .shadow(color: .black.opacity(0.45), radius: 10 * u, y: 4 * u)
-    }
-
-    private var clanCard: some View {
-        let ri = TacRank.index(TacRank.totalXP(t))
-        return Button { act(.ranks) } label: {
-            HStack(spacing: 12 * u) {
-                BladeEmblem().frame(width: 30 * u, height: 34 * u)
-                    .frame(width: 44 * u, height: 44 * u)
-                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.2, green: 0.04, blue: 0.06)))
-                VStack(alignment: .leading, spacing: 3 * u) {
-                    Text(TacProfile.name).font(.jk(11 * u, .heavy)).foregroundColor(.white).lineLimit(1)
-                    Text("Rank: \(TacRank.ranks[ri].name)").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.72)).lineLimit(1)
-                    Text("\(t.wins)W \(t.losses)L  ·  \(t.kills) K").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.72)).lineLimit(1)
+    private func menuRow(_ icon: String, _ title: String, _ sub: String, _ go: @escaping () -> Void) -> some View {
+        Button(action: go) {
+            HStack(spacing: 10 * u) {
+                Image(systemName: icon).font(.system(size: 17 * u, weight: .regular)).foregroundColor(.white.opacity(0.88)).frame(width: 28 * u)
+                VStack(alignment: .leading, spacing: 1 * u) {
+                    Text(title).font(.jk(13 * u, .heavy)).foregroundColor(.white)
+                    Text(sub).font(.jk(8 * u, .medium)).foregroundColor(.white.opacity(0.6))
                 }
                 Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 9 * u, weight: .semibold)).foregroundColor(.white.opacity(0.7))
             }
-            .padding(.horizontal, 10 * u).frame(width: 210 * u, height: 62 * u)
-            .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
-            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
-        }.buttonStyle(.plain)
-    }
-
-    private var quickStart: some View {
-        Button { act(.screen(2)) } label: {
-            HStack(spacing: 0) {
-                Spacer()
-                Text("QUICK START").font(.jk(15 * u, .heavy)).italic().foregroundColor(.white)
-                Spacer()
-                Image(systemName: "chevron.forward.2").font(.system(size: 14 * u, weight: .black)).foregroundColor(Color(red: 0.45, green: 0.75, blue: 1))
-                    .padding(.trailing, 14 * u)
-            }
-            .frame(width: 210 * u, height: 42 * u)
-            .background(ChamferShape(cut: 10 * u).fill(LinearGradient(colors: [Color(red: 0.07, green: 0.13, blue: 0.24), Color(red: 0.03, green: 0.06, blue: 0.13)], startPoint: .top, endPoint: .bottom)))
-            .overlay(ChamferShape(cut: 10 * u).stroke(Color(red: 0.35, green: 0.62, blue: 1).opacity(0.9), lineWidth: 1.4))
-            .shadow(color: Color(red: 0.2, green: 0.5, blue: 1).opacity(0.55), radius: 8 * u)
-        }.buttonStyle(.plain)
-    }
-
-    // MARK: bottom
-
-    private func slot(_ k: Int, selected: Bool) -> some View {
-        Button { act(.avatar) } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 4 * u).fill(selected ? Color(red: 0.55, green: 0.08, blue: 0.08) : glass)
-                if k == 0 {
-                    HeroFace(s: 28 * u).clipShape(RoundedRectangle(cornerRadius: 3 * u))
-                } else {
-                    Image(systemName: "person.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.4))
-                }
-            }
-            .frame(width: 32 * u, height: 32 * u)
-            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(selected ? Color(red: 1, green: 0.3, blue: 0.3) : edge, lineWidth: selected ? 1.6 : 1))
+            .padding(.horizontal, 10 * u).frame(width: 210 * u, height: 43 * u)
+            .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
         }.buttonStyle(TuiPress())
     }
 
-    private var slotBar: some View {
-        HStack(spacing: 10 * u) {
-            slot(0, selected: true)
-            slot(1, selected: false)
-            slot(2, selected: false)
-            Button { act(.avatar) } label: {
-                Image(systemName: "plus").font(.system(size: 14 * u, weight: .light)).foregroundColor(.white.opacity(0.6))
-                    .frame(width: 32 * u, height: 32 * u)
-                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
-                    .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
-            }.buttonStyle(TuiPress())
+    private var menu: some View {
+        VStack(spacing: 4 * u) {
+            menuRow("scope", "PLAY", "Free Roam / Missions") { act(.launch(10)) }
+            menuRow("flag.2.crossed.fill", "TERRITORY WAR", "Fight for control") { act(.launch(5)) }
+            menuRow("person.3.fill", "CREW", "Recruit / Manage") { act(.screen(20)) }
+            menuRow("house.fill", "SAFEHOUSE", "Upgrade / Customize") { act(.screen(15)) }
         }
-        .position(x: W * 0.51, y: H - 34 * u)
     }
 
-    private var cornerIcons: some View {
-        HStack(spacing: 14 * u) {
-            Image(systemName: "trash").font(.system(size: 12 * u))
-            Image(systemName: "dot.radiowaves.left.and.right").font(.system(size: 12 * u))
-            Image(systemName: "point.3.connected.trianglepath.dotted").font(.system(size: 12 * u))
-        }
-        .foregroundColor(.white.opacity(0.55))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 22 * u).padding(.bottom, 12 * u)
-        .allowsHitTesting(false)
-    }
-
-    // MARK: challenges
-
-    private func challenge(_ title: String, _ have: Int, _ need: Int, _ xp: Int) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle().stroke(Color.white.opacity(0.18), lineWidth: 2.5)
-                Circle().trim(from: 0, to: CGFloat(have) / CGFloat(max(1, need)))
-                    .stroke(blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
+    private func tileView(_ i: Int) -> some View {
+        let on = tile == i
+        let d = tiles[i]
+        return Button {
+            tile = i
+            if i == 1 { act(.screen(16)) }
+        } label: {
+            VStack(spacing: 0) {
+                ZStack {
+                    art(104 * u, 36 * u, anchor: d.anchor, zoom: d.zoom)
+                    LinearGradient(colors: [.clear, Color.black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                }
+                HStack(spacing: 5 * u) {
+                    Image(systemName: d.icon).font(.system(size: 9 * u, weight: .semibold)).foregroundColor(.white.opacity(0.9))
+                    Text(d.title).font(.jk(8.5 * u, .heavy)).foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 7 * u).frame(width: 104 * u, height: 22 * u)
+                .background(Color(red: 0.03, green: 0.05, blue: 0.09).opacity(0.92))
             }
-            .frame(width: 26, height: 26)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.jk(11, .semibold)).foregroundColor(.white).lineLimit(1)
-                Text("\(have)/\(need)").font(.jk(9, .medium)).foregroundColor(.white.opacity(0.55))
-            }
-            Spacer(minLength: 0)
-            Text("\(xp) XP").font(.jk(10, .heavy)).foregroundColor(blue)
-        }
-        .padding(.horizontal, 10).frame(height: 38)
+            .frame(width: 104 * u, height: 58 * u)
+            .clipShape(RoundedRectangle(cornerRadius: 3 * u))
+            .overlay(RoundedRectangle(cornerRadius: 3 * u).stroke(on ? blue : edge, lineWidth: on ? 1.5 : 1))
+            .shadow(color: on ? blue.opacity(0.5) : .clear, radius: 5 * u)
+        }.buttonStyle(.plain)
     }
 
-    private var challengePanel: some View {
-        VStack(spacing: 0) {
+    // MARK: right column
+
+    private func panelTitle(_ s: String) -> some View {
+        Text(s).font(.jk(10 * u, .heavy)).tracking(0.3 * u).foregroundColor(.white.opacity(0.92))
+    }
+
+    private var warPanel: some View {
+        Button { act(.launch(5)) } label: {
+            HStack(spacing: 8 * u) {
+                VStack(alignment: .leading, spacing: 4 * u) {
+                    panelTitle("NEXT TERRITORY WAR")
+                    HStack(spacing: 4 * u) {
+                        Image(systemName: "clock").font(.system(size: 8 * u)).foregroundColor(.white.opacity(0.8))
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            let period: Double = 3 * 3600
+                            let left = period - ctx.date.timeIntervalSince1970.truncatingRemainder(dividingBy: period)
+                            let s = Int(left)
+                            Text(String(format: "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60))
+                                .font(.jk(10 * u, .semibold)).monospacedDigit().foregroundColor(.white)
+                        }
+                    }
+                    HStack(spacing: 6 * u) {
+                        Image(systemName: "crown.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.85))
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("RIVERSIDE VS").font(.jk(8 * u, .heavy)).foregroundColor(.white)
+                            Text("KANE GANG").font(.jk(8 * u, .medium)).foregroundColor(.white.opacity(0.7))
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+                art(60 * u, 54 * u, anchor: UnitPoint(x: 0.5, y: 0.3), zoom: 2.4)
+                    .clipShape(RoundedRectangle(cornerRadius: 2 * u))
+            }
+            .padding(.horizontal, 9 * u).frame(width: 190 * u, height: 72 * u)
+            .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private func challengeRow(_ icon: String, _ text: String, _ have: Int, _ need: Int) -> some View {
+        HStack(spacing: 8 * u) {
+            Image(systemName: icon).font(.system(size: 12 * u)).foregroundColor(.white.opacity(0.8)).frame(width: 20 * u)
+            Text(text).font(.jk(9 * u, .medium)).foregroundColor(.white.opacity(0.92)).lineLimit(2)
+            Spacer(minLength: 2 * u)
+            Text("\(have)/\(need)").font(.jk(9.5 * u, .heavy)).monospacedDigit().foregroundColor(.white)
+        }
+        .frame(height: 28 * u)
+    }
+
+    private var challengesPanel: some View {
+        let rec = ABRecords.load()
+        return Button { act(.screen(18)) } label: {
+            VStack(alignment: .leading, spacing: 2 * u) {
+                panelTitle("DAILY CHALLENGES")
+                challengeRow("figure.boxing", "Win 2\nMatches", t.wins % 2, 2)
+                challengeRow("scope", "Get 10\nHeadshots", rec.headKills % 10, 10)
+                challengeRow("flag.fill", "Play 3\nMatches", (t.wins + t.losses) % 3, 3)
+            }
+            .padding(.horizontal, 9 * u).padding(.vertical, 7 * u).frame(width: 190 * u, height: 115 * u, alignment: .topLeading)
+            .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private func crewRow(_ name: String, _ what: String, _ ago: String) -> some View {
+        HStack(spacing: 6 * u) {
+            Text(String(name.prefix(1))).font(.jk(8 * u, .heavy)).foregroundColor(.white)
+                .frame(width: 18 * u, height: 18 * u).background(Circle().fill(Color.white.opacity(0.16)))
+                .overlay(alignment: .bottomTrailing) { Circle().fill(Color.green).frame(width: 5 * u, height: 5 * u) }
+            (Text(name).foregroundColor(blue) + Text(" \(what)").foregroundColor(.white.opacity(0.8)))
+                .font(.jk(7.5 * u, .medium)).lineLimit(1)
+            Spacer(minLength: 2 * u)
+            Text(ago).font(.jk(7 * u, .medium)).foregroundColor(.white.opacity(0.5))
+        }
+        .frame(height: 22 * u)
+    }
+
+    private var crewPanel: some View {
+        let xp = TacRank.totalXP(t)
+        let ri = TacRank.index(xp)
+        return Button { act(.screen(20)) } label: {
+            VStack(alignment: .leading, spacing: 3 * u) {
+                panelTitle("CREW ACTIVITY")
+                HStack(spacing: 8 * u) {
+                    BladeEmblem().frame(width: 22 * u, height: 25 * u)
+                    VStack(alignment: .leading, spacing: 3 * u) {
+                        Text("\(TacProfile.name.uppercased()) CREW").font(.jk(8.5 * u, .heavy)).foregroundColor(.white).lineLimit(1)
+                        HStack {
+                            Text("Lv. \(ri + 1)").font(.jk(7 * u, .medium)).foregroundColor(.white.opacity(0.7))
+                            Spacer()
+                            Text("\(Int(TacRank.progress(xp) * 100))%").font(.jk(7 * u, .medium)).foregroundColor(.white.opacity(0.7))
+                        }
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.white.opacity(0.14))
+                            Capsule().fill(blue).frame(width: 118 * u * CGFloat(TacRank.progress(xp)))
+                        }
+                        .frame(width: 118 * u, height: 3 * u)
+                    }
+                }
+                .padding(.vertical, 3 * u)
+                Rectangle().fill(edge).frame(height: 1)
+                crewRow("Jax", "joined the crew", "2h ago")
+                crewRow("Nova", "is online", "3h ago")
+            }
+            .padding(.horizontal, 9 * u).padding(.vertical, 7 * u).frame(width: 190 * u, height: 115 * u, alignment: .topLeading)
+            .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private var partyPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(["SOLO", "DUO", "SQUAD"].enumerated()), id: \.offset) { i, s in
+                Button { party = i } label: {
+                    Text(s).font(.jk(8.5 * u, .heavy)).foregroundColor(party == i ? .white : .white.opacity(0.7))
+                        .frame(maxWidth: .infinity).frame(height: 20 * u)
+                        .background(party == i ? Color(red: 0.4, green: 0.5, blue: 0.7).opacity(0.7) : .clear)
+                }.buttonStyle(.plain)
+            }
+        }
+        .frame(width: 204 * u).background(glass)
+        .overlay(RoundedRectangle(cornerRadius: 2 * u).stroke(edge, lineWidth: 1))
+    }
+
+    private var playNow: some View {
+        Button {
+            switch tile {
+            case 1: act(.screen(16))
+            case 2: act(.launch(5))
+            case 3: act(.launch(1))
+            default: act(.launch(10))
+            }
+        } label: {
             HStack {
-                Text("DAILY CHALLENGES").font(.jk(11, .heavy)).foregroundColor(.white)
                 Spacer()
-                Text("RESETS 12h").font(.jk(9, .semibold)).foregroundColor(.white.opacity(0.6))
+                Text("PLAY NOW").font(.jk(18 * u, .heavy)).tracking(1 * u).foregroundColor(.white)
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13 * u, weight: .bold)).foregroundColor(.white).padding(.trailing, 14 * u)
             }
-            .padding(.horizontal, 10).frame(height: 28)
-            challenge("Get 25 Kills", t.kills % 25, 25, 1000)
-            challenge("Win 3 Matches", t.wins % 3, 3, 1500)
-            challenge("Play 5 Matches", (t.wins + t.losses) % 5, 5, 1000)
-        }
-        .frame(width: 250)
-        .background(Color(red: 0.04, green: 0.05, blue: 0.05).opacity(0.94))
-        .overlay(Rectangle().stroke(blue.opacity(0.6), lineWidth: 1))
+            .frame(width: 204 * u, height: 40 * u)
+            .background(RoundedRectangle(cornerRadius: 6 * u).fill(LinearGradient(colors: [Color(red: 0.08, green: 0.13, blue: 0.22), Color(red: 0.03, green: 0.06, blue: 0.12)], startPoint: .top, endPoint: .bottom)))
+            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(Color(red: 0.55, green: 0.7, blue: 1).opacity(0.7), lineWidth: 1.4))
+            .shadow(color: blue.opacity(0.35), radius: 8 * u)
+        }.buttonStyle(TuiPress())
     }
 
     // MARK: body
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // the hero stands in the 3D hideout behind this page (HideoutBackdrop in Lobby.swift)
+            // the hero stands in the hideout behind this page (HideoutBackdrop in Lobby.swift); tap him to inspect
+            Color.clear.contentShape(Rectangle())
+                .frame(width: W * 0.2, height: H * 0.62)
+                .position(x: W * 0.5, y: H * 0.55)
+                .onTapGesture { act(.screen(17)) }
 
-            // the board, rack and chest in the hideout art are buttons
-            HideoutHotspots(size: size, act: act)
-
-            newsPanel
-                .padding(.leading, 27 * u).padding(.top, 100 * u)
-
-            VStack(alignment: .leading, spacing: 10 * u) {
-                Spacer(minLength: 0)
-                clanCard
-                quickStart
+            VStack(alignment: .leading, spacing: 6 * u) {
+                turf
+                menu
             }
-            .padding(.leading, 27 * u).padding(.bottom, 52 * u)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(.leading, 27 * u).padding(.top, 52 * u)
 
-            Text("Version 1.0").font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.45))
+            VStack(alignment: .trailing, spacing: 5 * u) {
+                warPanel
+                challengesPanel
+                crewPanel
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.trailing, 20 * u).padding(.top, 52 * u)
+
+            HStack(spacing: 6 * u) { ForEach(0..<4, id: \.self) { tileView($0) } }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(.leading, 6 * u).padding(.bottom, 4 * u)
-                .allowsHitTesting(false)
+                .padding(.leading, 27 * u).padding(.bottom, 24 * u)
 
-            slotBar
-            cornerIcons
-            topBar
-
-            if showChallenges {
-                Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { showChallenges = false }
-                challengePanel.frame(maxWidth: .infinity, maxHeight: .infinity).transition(.opacity)
+            VStack(alignment: .trailing, spacing: 6 * u) {
+                partyPicker
+                playNow
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .padding(.trailing, 20 * u).padding(.bottom, 20 * u)
+
+            HStack(spacing: 4 * u) {
+                Image(systemName: "globe").font(.system(size: 7 * u))
+                Text("Version 1.0.0").font(.jk(7.5 * u, .medium))
+            }
+            .foregroundColor(.white.opacity(0.5))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(.leading, 27 * u).padding(.bottom, 7 * u)
+            .allowsHitTesting(false)
+
+            LobbyTopBar(t: t, u: u, selected: 0, act: act)
         }
         .frame(width: size.width, height: size.height)
         .onAppear {
-            if ![0, 1, 5, 8].contains(nav.tacMode) { nav.tacMode = 8 }
+            if ![0, 1, 5, 8, 9, 10].contains(nav.tacMode) { nav.tacMode = 10 }
             if !TacLobbyMaps.ids.contains(nav.tacMap) { nav.tacMap = TacLobbyMaps.fallback }
         }
     }

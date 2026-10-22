@@ -29,7 +29,7 @@ struct LobbyTopBar: View {
         let on = i == selected
         return Button(action: action) {
             Text(title).font(.jk(13 * u, on ? .heavy : .semibold)).foregroundColor(on ? .white : .white.opacity(0.62))
-                .padding(.horizontal, 18 * u).frame(height: 40 * u)
+                .padding(.horizontal, 14 * u).frame(height: 40 * u)
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(on ? blue : .clear).frame(height: 2 * u).padding(.horizontal, 10 * u)
                         .shadow(color: blue.opacity(0.8), radius: 4 * u)
@@ -77,15 +77,16 @@ struct LobbyTopBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            AirbladeLogo(size: 18 * u).padding(.leading, 26 * u).padding(.trailing, 18 * u)
-            topNav("HideOut", 0) { act(.nav(0)) }
-            topNav("Play", 1) { act(.screen(1)) }
-            topNav("Shop", 2) { act(.nav(6)) }
-            topNav("Inventory", 3) { act(.screen(15)) }
-            topNav("Event", 4) { act(.season(0)) }
+            icon("person.crop.circle") { act(.ranks) }.padding(.leading, 18 * u).padding(.trailing, 20 * u)
+            topNav("HIDEOUT", 0) { act(.nav(0)) }
+            topNav("MAP", 1) { act(.screen(19)) }
+            topNav("CREW", 2) { act(.screen(20)) }
+            topNav("INVENTORY", 3) { act(.screen(15)) }
+            topNav("SHOP", 4) { act(.screen(21)) }
+            topNav("EVENTS", 5) { act(.screen(22)) }
             Spacer(minLength: 6 * u)
             HStack(spacing: 22 * u) {
-                currency("C", game.s.ex.gems.formatted(), Color(red: 1, green: 0.75, blue: 0.22))
+                currency("$", game.s.ex.gems.formatted(), Color(red: 1, green: 0.75, blue: 0.22))
                 currency("ZC", "\(t.rating)", Color(red: 0.4, green: 0.7, blue: 1))
             }
             .padding(.trailing, 24 * u)

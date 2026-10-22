@@ -29,7 +29,15 @@ struct ABOperation: Identifiable {
         ABOperation(id: 3, code: "OP-04", name: "BLADE TRIAL", mode: 8, map: 9,
                     brief: "One arena, no way out. Pillars, lane walls and crates to climb. Blades out.",
                     objectives: ["Win the duel", "Use the crates to reach the high ground", "Air slashes and backstabs deal extra damage"],
-                    gun: "smg", side: "pistol", tip: "Chain slashes inside 1.6 s to build a combo.")
+                    gun: "smg", side: "pistol", tip: "Chain slashes inside 1.6 s to build a combo."),
+        ABOperation(id: 4, code: "OP-05", name: "MOVEMENT LAB", mode: 9, map: 9,
+                    brief: "90 seconds of practice. Seven targets stand in the arena and pop back up when you drop them. Nothing shoots back.",
+                    objectives: ["Drop as many targets as you can", "Wall-run and sword-jump between them", "Chain slashes inside 1.6 s for a combo", "Score counts targets, best chain, air kills and accuracy"],
+                    gun: "smg", side: "pistol", tip: "Slash in the air for a sword jump, then slash again to keep your combo going."),
+        ABOperation(id: 5, code: "OP-06", name: "FREE ROAM", mode: 10, map: 3,
+                    brief: "No timer, no teams. Walk Town with your hands up: pedestrians, two rival crews and jobs on your phone. Cash is banked as coins when you leave.",
+                    objectives: ["Take jobs from the phone: Dead Drop, Turf War, Take Down Razor", "Fight with fists: jab, cross, kick finisher", "Air kicks and rush punches hit harder", "Getting knocked out costs 15% of your cash"],
+                    gun: "pistol", side: "pistol", tip: "Wall-run and jump-kick: an air kick hits for 26.")
     ]
 }
 
@@ -77,7 +85,7 @@ struct MapPreview: View {
                 ctx.stroke(Path(ellipseIn: m), with: .color(orange), lineWidth: 1.5)
                 ctx.draw(Text("CP").font(.system(size: 11, weight: .heavy)).foregroundColor(orange), at: CGPoint(x: m.midX, y: m.midY))
             }
-            let spawnSets: [([CGPoint], Color)] = op.mode == 8 ? [(Array(d.spawns.prefix(1)), blue), (Array(d.spawns.dropFirst(10).prefix(1)), orange)] : [(d.atkSpawn, blue), (d.defSpawn, orange)]
+            let spawnSets: [([CGPoint], Color)] = op.mode == 9 ? [(Array(d.atkSpawn.dropFirst(2).prefix(1)), blue), (d.spawns, orange)] : (op.mode == 8 ? [(Array(d.spawns.prefix(1)), blue), (Array(d.spawns.dropFirst(10).prefix(1)), orange)] : [(d.atkSpawn, blue), (d.defSpawn, orange)])
             for (pts, c) in spawnSets {
                 for p in pts where b.contains(p) {
                     let q = P(p)
@@ -129,7 +137,7 @@ struct MissionBoardView: View {
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 10 * u, weight: .bold)).foregroundColor(on ? orange : .white.opacity(0.3))
             }
-            .padding(.horizontal, 10 * u).frame(height: 54 * u)
+            .padding(.horizontal, 10 * u).frame(height: 46 * u)
             .background(RoundedRectangle(cornerRadius: 3 * u).fill(card))
             .overlay(alignment: .leading) { Rectangle().fill(on ? orange : .clear).frame(width: 3 * u) }
             .overlay(RoundedRectangle(cornerRadius: 3 * u).stroke(on ? orange : edge, lineWidth: on ? 1.4 : 1))
@@ -157,8 +165,8 @@ struct MissionBoardView: View {
                 Text(TacLobbyMaps.title(op.map)).font(.jk(9 * u, .heavy)).tracking(2 * u).foregroundColor(.white.opacity(0.75))
                     .padding(.horizontal, 7 * u).frame(height: 18 * u).background(Color.black.opacity(0.6)).padding(6 * u)
                 HStack(spacing: 10 * u) {
-                    legend(Color(red: 0.25, green: 0.65, blue: 1), op.mode == 8 ? "You" : "Your spawn")
-                    legend(orange, op.mode == 8 ? "Rival" : "Enemy spawn")
+                    legend(Color(red: 0.25, green: 0.65, blue: 1), op.mode >= 8 ? "You" : "Your spawn")
+                    legend(orange, op.mode == 9 ? "Targets" : (op.mode == 10 ? "Crew corners" : (op.mode == 8 ? "Rival" : "Enemy spawn")))
                 }
                 .padding(.horizontal, 7 * u).frame(height: 18 * u).background(Color.black.opacity(0.6))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(6 * u)

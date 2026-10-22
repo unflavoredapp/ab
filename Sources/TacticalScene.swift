@@ -102,6 +102,7 @@ final class TacScene {
     var lastStormRad: CGFloat = -1
     var lastStormC = CGPoint.zero
     let bombNode = MXNode()
+    var jobBeam: MXNode? = nil
 
     private var texCache: [String: UIImage] = [:]
     private let props = TwProps()
@@ -1074,12 +1075,26 @@ final class TacScene {
         bombNode.addChildNode(bl)
         bombNode.isHidden = true
         root.addChildNode(bombNode)
+        // Free Roam job marker: a tall gold beam
+        let jcol = UIColor(red: 1, green: 0.8, blue: 0.2, alpha: 1)
+        let jmat = mat(nil, color: jcol, emission: jcol)
+        jmat.lightingModel = .constant
+        jmat.isDoubleSided = true
+        jmat.transparency = 0.3
+        jmat.writesToDepthBuffer = false
+        let jb = MXNode(geometry: MXCylinder(radius: 9, height: 420))
+        jb.geometry?.firstMaterial = jmat
+        jb.castsShadow = false
+        jb.renderingOrder = 9
+        jb.isHidden = true
+        root.addChildNode(jb)
+        jobBeam = jb
         // players
                 TAtt.resetCamo()
                 for p in e.players {
             let rt = MXNode()
-            let col: UIColor = p.isPlayer ? UIColor(red: 0.3, green: 0.9, blue: 0.45, alpha: 1) : (p.team == e.me.team ? UIColor(red: 0.25, green: 0.6, blue: 1, alpha: 1) : UIColor(red: 1, green: 0.25, blue: 0.3, alpha: 1))
-            let teamC: UIColor = p.team == e.me.team ? UIColor(red: 0.25, green: 0.6, blue: 1, alpha: 1) : UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1)
+            let col: UIColor = p.civ ? UIColor(red: 0.82, green: 0.8, blue: 0.74, alpha: 1) : p.isPlayer ? UIColor(red: 0.3, green: 0.9, blue: 0.45, alpha: 1) : (p.team == e.me.team ? UIColor(red: 0.25, green: 0.6, blue: 1, alpha: 1) : UIColor(red: 1, green: 0.25, blue: 0.3, alpha: 1))
+            let teamC: UIColor = p.civ ? UIColor(red: 0.7, green: 0.68, blue: 0.62, alpha: 1) : p.crew == 1 ? UIColor(red: 1, green: 0.74, blue: 0.2, alpha: 1) : p.crew == 2 ? UIColor(red: 0.4, green: 0.9, blue: 0.5, alpha: 1) : p.team == e.me.team ? UIColor(red: 0.25, green: 0.6, blue: 1, alpha: 1) : UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1)
             let pStyle = TacAvatar.style(p.isPlayer ? TacAvatar.myKey : p.handle)
             var stf: TacOperator.Bot? = nil
             if !HeroBody.available, p.rank == 0, let b = TacOperator.bot(style: pStyle), b.setGun(p.gun) { stf = b }
@@ -1603,8 +1618,8 @@ final class TacScene {
             if p.alive {
                 deadK[i] = 0
                 heads[i].isHidden = true
-                guns[i].isHidden = false
-                flashes[i].isHidden = !(p.flash > 0)
+                guns[i].isHidden = e.gameMode == 10
+                flashes[i].isHidden = e.gameMode == 10 || !(p.flash > 0)
                 shirts[i].emission.contents = p.hurt > 0 ? UIColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1) : UIColor.black
                 let dpx = p.pos.x - lastPos[i].x, dpy = p.pos.y - lastPos[i].y
                 let moved = hypot(dpx, dpy)
@@ -1619,11 +1634,16 @@ final class TacScene {
                 }
                 if i < heroClothIdx.count, let hc = heroCloth[heroClothIdx[i]] {
                     hc.update(t: Float(e.time), run: mvK[i], yawVel: 0)
-                    hc.sword?.isHidden = !p.knife
+                    hc.sword?.isHidden = !p.knife || e.gameMode == 10
                     if p.knife { guns[i].isHidden = true }
                 }
                 let bob = abs(Float(cos(walkPh[i]))) * 0.9 * mvK[i] + sin(Float(e.time) * 1.6 + Float(i)) * 0.12
-                let lean: Float = -0.1 * mvK[i] + (p.flash > 0 ? 0.045 : 0)
+                var lean: Float = -0.1 * mvK[i] + (p.flash > 0 ? 0.045 : 0)
+                if e.gameMode == 10 {
+                    if p.isPlayer && e.roam.swingT > 0 { lean -= 0.5 * Float(e.roam.swingT / 0.28) * (e.roam.step == 2 ? 1.5 : 1) }
+                    else if p.flash > 0 { lean -= 0.35 }
+                    if p.stun > 0 { lean += 0.35 }
+                }
                 bodies[i].eulerAngles = MXVector3(0, 0, lean)
                 bodies[i].position = MXVector3(0, bob, 0)
                 var ek = 0
@@ -1714,6 +1734,12 @@ final class TacScene {
         }
         for (i, node) in packNodes.enumerated() where i < e.packs.count {
             node.isHidden = e.packs[i].taken
+        }
+        if let jb = jobBeam {
+            if e.gameMode == 10, let m = e.roamMarker {
+                jb.isHidden = false
+                jb.position = MXVector3(Float(sx(m)), 210, Float(m.y))
+            } else { jb.isHidden = true }
         }
         let bombHere = e.planted && TMap.floorOf(e.bombPos) == focusFloor
         bombNode.isHidden = !bombHere

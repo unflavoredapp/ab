@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 enum LobbyAct {
-    case nav(Int), screen(Int), season(Int), avatar, friends, ranks, stats, loadout
+    case nav(Int), screen(Int), season(Int), avatar, friends, ranks, stats, loadout, launch(Int)
 }
 
 /// shared look of the new lobby

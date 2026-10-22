@@ -18,7 +18,7 @@ struct ABResult {
     var rankedUp: Bool { rankAfter > rankBefore }
 }
 
-/// AIRBLADE's per-match records, kept beside TacData (separate key so old saves stay readable).
+/// AIRBLADE's career records, kept beside TacData (separate key so old saves stay readable).
 struct ABRecords: Codable {
     var deaths = 0
     var swordKills = 0
@@ -28,6 +28,33 @@ struct ABRecords: Codable {
     var bestCombo = 0
     var bestStreak = 0
     var matches = 0
+    var wins = 0
+    var flawlessWins = 0        // won without dying
+    var headKills = 0
+    var bestMulti = 0
+    var labRuns = 0
+    var labBestScore = 0
+    var labBestCombo = 0
+    var labBestAcc = 0          // percent
+    var claimed: [String] = []  // challenge ids already paid out
+
+    init() {}
+
+    // every field is optional on disk so records saved by earlier builds still load
+    init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: Keys.self)
+        func i(_ k: Keys) -> Int { (try? c.decodeIfPresent(Int.self, forKey: k)) ?? 0 }
+        deaths = i(.deaths); swordKills = i(.swordKills); airKills = i(.airKills); backstabs = i(.backstabs)
+        bestKills = i(.bestKills); bestCombo = i(.bestCombo); bestStreak = i(.bestStreak); matches = i(.matches)
+        wins = i(.wins); flawlessWins = i(.flawlessWins); headKills = i(.headKills); bestMulti = i(.bestMulti)
+        labRuns = i(.labRuns); labBestScore = i(.labBestScore); labBestCombo = i(.labBestCombo); labBestAcc = i(.labBestAcc)
+        claimed = (try? c.decodeIfPresent([String].self, forKey: .claimed)) ?? []
+    }
+
+    enum Keys: String, CodingKey {
+        case deaths, swordKills, airKills, backstabs, bestKills, bestCombo, bestStreak, matches
+        case wins, flawlessWins, headKills, bestMulti, labRuns, labBestScore, labBestCombo, labBestAcc, claimed
+    }
 
     private static let key = "ab.records"
 
@@ -75,6 +102,9 @@ extension Game {
         rec.swordKills += e.swordKills
         rec.airKills += e.airKills
         rec.backstabs += e.backstabs
+        rec.headKills += e.headKills
+        rec.bestMulti = max(rec.bestMulti, e.bestMulti)
+        if e.won { rec.wins += 1; if e.me.deaths == 0 { rec.flawlessWins += 1 } }
         rec.bestKills = max(rec.bestKills, e.kills)
         rec.bestCombo = max(rec.bestCombo, e.bestCombo)
         rec.bestStreak = max(rec.bestStreak, e.bestStreak)

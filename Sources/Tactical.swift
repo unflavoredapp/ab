@@ -316,6 +316,13 @@ final class TPlayer {
     var kills = 0
     var deaths = 0
     var dmgDealt: CGFloat = 0
+    /// Movement Lab target: stands still, never fights back
+    var dummy = false
+    /// Free Roam: pedestrian (never fights), crew id (0 none), tier (0 regular, 1 bruiser, 2 boss), hit stun
+    var civ = false
+    var crew = 0
+    var tier = 0
+    var stun: CGFloat = 0
     var path: [CGPoint] = []
     var pathT: CGFloat = 0
     var pathDest = CGPoint.zero
@@ -499,6 +506,12 @@ final class TacticalEngine {
     var knifeKill = false
     // AIRBLADE combat feedback (player only)
     var slashBack = false
+    var headKills = 0
+    var bestMulti = 0
+    // Movement Lab (mode 9)
+    var labShots = 0
+    var labHits = 0
+    var labGoT: CGFloat = 0
     var hitMarkT: CGFloat = 0
     var hitKind = 0                 // 0 hit, 1 heavy hit, 2 kill
     var comboN = 0
@@ -672,10 +685,10 @@ final class TacticalEngine {
     func setup(gun: String, diff: Int, mode: Int = 0) {
         self.diff = diff
         gameMode = mode
-        TMap.load(mode == 8 ? 9 : 3)   // Duel is fought in the vertical arena, everything else in the Town
+        TMap.load(mode == 8 || mode == 9 ? 9 : 3)   // Duel and the Movement Lab use the vertical arena, everything else the Town
         tags = []
         myGun = gun
-        let nb = mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9))
+        let nb = mode == 10 ? 18 : mode == 9 ? 7 : (mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9)))
         var names: [(String, String, String)] = TacRoster.pick(nb)
         while names.count < nb { let k = names.count + 1; names.append(("Recruit \(k)", "recruit\(k)", "")) }
         players = [TPlayer(id: 0, team: 0, name: TacProfile.name, handle: "you", emoji: "", isPlayer: true)]
@@ -684,10 +697,13 @@ final class TacticalEngine {
             let bp = TPlayer(id: i + 1, team: mode == 8 ? 1 : (mode == 7 ? (i < (nb - 1) / 2 ? 0 : 1) : (i < 4 ? 0 : 1)), name: names[i].0, handle: names[i].1, emoji: names[i].2, isPlayer: false)
             bp.rank = TacRoster.rank(of: names[i].1)
             bp.trophies = max(0, TacLeague.myRating + Int.random(in: -400...900) + (Int.random(in: 0..<8) == 0 ? Int.random(in: 1000...6000) : 0))
+            if mode == 9 { bp.dummy = true; bp.team = 1; bp.name = "Target \(i + 1)"; bp.handle = "target\(i + 1)" }
             players.append(bp)
         }
+        labReset()
+        if mode == 10 { roamSetup() }
         scores = [0, 0]
-        killTarget = mode == 8 ? 5 : (mode == 4 ? 20 : (mode == 5 ? 100 : 30))
+        killTarget = mode == 9 || mode == 10 ? 99999 : mode == 8 ? 5 : (mode == 4 ? 20 : (mode == 5 ? 100 : 30))
         if mode == 4 {
             for p in players { p.team = p.id }
             scores = Array(repeating: 0, count: 10)
@@ -705,6 +721,7 @@ final class TacticalEngine {
         startRound()
     }
     var over = false
+    var roam = RoamState()
 
     private func gunPick() -> String {
         let r = Int.random(in: 0..<100)
@@ -897,8 +914,8 @@ final class TacticalEngine {
         }
         if phase == 0 {
             timer -= dt
-            if timer <= 0 { phase = 1; timer = gameMode == 0 ? 100 : (gameMode == 6 ? 99999 : (gameMode == 7 ? TFront.minutes * 60 : 240)); banner = gameMode == 6 ? "DEPLOYED" : "GO"; bannerT = 1 }
-            for p in players where !p.isPlayer { botLook(p, dt) }
+            if timer <= 0 { phase = 1; timer = gameMode == 0 ? 100 : (gameMode == 6 ? 99999 : (gameMode == 7 ? TFront.minutes * 60 : (gameMode == 9 ? ABLab.duration : (gameMode == 10 ? 99999 : 240)))); banner = gameMode == 6 ? "DEPLOYED" : "GO"; bannerT = 1 }
+            for p in players where !p.isPlayer && !p.dummy && !p.civ { botLook(p, dt) }
             return
         }
         // live
@@ -919,7 +936,9 @@ final class TacticalEngine {
             p.vz -= TMove.gravity * dt
             if p.z <= 0 { p.z = 0; p.vz = 0 }
         }
-        for p in players where !p.isPlayer && p.alive { botThink(p, dt, &planting, &defusing) }
+        for p in players where !p.isPlayer && p.alive && !p.dummy && !p.civ && p.stun <= 0 { botThink(p, dt, &planting, &defusing) }
+        if gameMode == 9 { labTick(dt) }
+        if gameMode == 10 { roamTick(dt) }
         for i in packs.indices where !packs[i].taken {
             for p in players where p.alive && p.hp < 100 && tDist(p.pos, packs[i].pos) < 24 {
                 p.hp = min(100, p.hp + 40)
@@ -943,7 +962,7 @@ final class TacticalEngine {
                 for a in players where a.team == me.team && a.alive {
                     if TMap.pdist(a.pos, e.pos) < (gameMode == 7 && a.cls == 3 ? 1500 : 900) * (a.isPlayer ? TPerk.spotMul : 1) && see(a.pos, e.pos) { e.spotted = true; e.seenEver = true; break }
                 }
-                if e.spotted && !was && e.pingCd <= 0 {
+                if e.spotted && !was && e.pingCd <= 0 && !e.civ {
                     e.pingCd = 4
                     pings.append(Ping(pos: e.pos, text: TMap.roomName(e.pos), life: 3.5))
                     if pings.count > 6 { pings.removeFirst() }
@@ -1059,6 +1078,8 @@ final class TacticalEngine {
         if p.isPlayer { rbuf.removeAll(); replayOn = false; pz = 0; pvz = 0; wallRunT = 0; ms = TMove.State(); dashT = 0; pvel = .zero }
         p.z = 0; p.vz = 0; p.knock = .zero
         if gameMode == 7 { frontRespawn(p); return }
+        if gameMode == 9 { labPlace(p); return }
+        if gameMode == 10 { roamPlace(p); return }
         var list = p.id % 2 == 0 ? TMap.atkSpawn : TMap.defSpawn
         if gameMode != 0 && gameMode != 6 { list = TMap.spreadPoints(14, sep: 500) + list }
         var best = list[0], bd: CGFloat = -1
@@ -1146,6 +1167,7 @@ final class TacticalEngine {
     }
 
     private func swapGun(_ p: TPlayer) {
+        if gameMode == 10 { return }
         if p.knife { p.knife = false; p.fireCd = 0.12; return }
         guard gameMode != 3, p.reloadT <= 0 else { return }
         let g = p.gun, m = p.mag, s = p.spare
@@ -1324,7 +1346,7 @@ final class TacticalEngine {
         if wantSlash { wantSlash = false; if p.alive && p.fireCd <= 0 { slash(p, blade: true); swordJump(p) } }
         if wantSwap { wantSwap = false; swapGun(p) }
         if wantKnife { wantKnife = false; if !p.knife { p.knife = true; p.reloadT = 0; scoped = false; ads = false; p.fireCd = max(p.fireCd, 0.12) } }
-        if wantGun { wantGun = false; if p.knife { p.knife = false; p.fireCd = max(p.fireCd, 0.12) } }
+        if wantGun { wantGun = false; if p.knife && gameMode != 10 { p.knife = false; p.fireCd = max(p.fireCd, 0.12) } }
         if p.reloadT > 0 {
             p.reloadT -= dt
             if p.reloadT <= 0 { finishReload(p) }
@@ -1380,7 +1402,7 @@ final class TacticalEngine {
     /// melee: hits the nearest enemy in a short front arc; from behind it is an instant kill; also chips breakables in front
     /// the slash's upward cut lifts you: in the air it launches you higher, next to a wall it keeps you climbing
     private func swordJump(_ p: TPlayer) {
-        guard p.isPlayer, p.knife, pz > TMove.minAirZ else { return }
+        guard p.isPlayer, p.knife, gameMode != 10, pz > TMove.minAirZ else { return }
         var vs = ms
         vs.z = pz; vs.vz = pvz
         guard TMove.swordLift(&vs) else { return }
@@ -1390,6 +1412,8 @@ final class TacticalEngine {
     }
 
     private func slash(_ p: TPlayer, blade: Bool = false) {
+        if gameMode == 10 { brawl(p); return }
+        if p.isPlayer && gameMode == 9 { labShots += 1 }
         p.fireCd = blade ? 0.38 : 0.55
         p.flash = 0.06
         p.noiseT = 0.8
@@ -1483,6 +1507,7 @@ final class TacticalEngine {
             }
             bullets.append(bl)
         }
+        if p.isPlayer && gameMode == 9 { labShots += 1 }
         p.mag -= 1
         p.fireCd = (1 / g.rate) * (p.isPlayer ? 1 : 1.15)
         p.flash = am.silenced ? 0 : 0.05
@@ -1508,9 +1533,11 @@ final class TacticalEngine {
         if let o = players.first(where: { $0.id == owner }), o.team != victim.team { o.dmgDealt += min(max(0, victim.hp), amt) }
         victim.hp -= victim.crouch ? amt * 0.7 : amt
         victim.hurt = 0.25
+        if gameMode == 10 { roamHurt(victim, by: owner) }
         if owner > -2 && impacts.count < 48 { impacts.append(Impact(pos: victim.pos, nx: 0, ny: 0, kind: 1)) }
         if owner == 0 && victim.team != me.team {
             hitT = 0.2
+            if gameMode == 9 { labHits += 1 }
             hitMarkT = 0.22
             hitKind = amt >= 45 ? 1 : 0
             if knifeKill { comboN += 1; comboT = 1.6; bestCombo = max(bestCombo, comboN) }
@@ -1537,10 +1564,11 @@ final class TacticalEngine {
                 if k.isPlayer { fxT = 1; fxId = killFx; fxSerial += 1; announceKill(victim, amt: amt) }
             }
             if victim.isPlayer { streak = 0; comboN = 0; comboT = 0 }
+            if gameMode == 10 { roamKilled(victim, killer: killer) }
             if let k = killer, k.isPlayer, k.team != victim.team, let msg = TacMeta.addMastery(k.gun) { pop(k.pos, msg, TUI.gold) }
             if gameMode == 6 && !victim.isPlayer { raidBotDrop(victim, by: owner) }
             if gameMode != 0 {
-                victim.respawn = gameMode == 6 ? 0 : (victim.isPlayer && replayOn ? 999 : (gameMode == 7 ? 6 : 3))
+                victim.respawn = gameMode == 6 ? 0 : (victim.isPlayer && replayOn ? 999 : (gameMode == 7 ? 6 : (gameMode == 9 ? 1.2 : (gameMode == 10 ? (victim.isPlayer ? 4 : (victim.civ ? 20 : 35)) : 3))))
                 if gameMode == 6 && victim.isPlayer { brPlace = players.filter { $0.alive }.count + 1; brEndT = 3 }
                 if (gameMode == 1 || gameMode == 4 || gameMode == 8), let k = killer, k.team != victim.team { scores[k.team] += 1 }
                 if gameMode == 7 { scores[victim.team] += 1 }
@@ -1564,6 +1592,7 @@ final class TacticalEngine {
         bestStreak = max(bestStreak, streak)
         multiN = multiT > 0 ? multiN + 1 : 1
         multiT = 3.5
+        bestMulti = max(bestMulti, multiN)
         hitKind = 2
         hitMarkT = 0.35
         var tags: [String] = []
@@ -1573,6 +1602,7 @@ final class TacticalEngine {
             if air { airKills += 1; tags.append("AIR SLASH") }
             if comboN >= 2 { tags.append("\(comboN)-HIT COMBO") }
         } else if amt >= 45 {
+            headKills += 1
             tags.append("HEADSHOT")
         }
         if streak == 3 { tags.append("3 STREAK") } else if streak == 5 { tags.append("UNSTOPPABLE") } else if streak >= 8 && streak % 4 == 0 { tags.append("\(streak) STREAK") }
@@ -1813,6 +1843,7 @@ final class TacticalEngine {
     }
 
     private func objective(_ p: TPlayer) -> CGPoint {
+        if gameMode == 10 { return roamGoal(p) }
         if gameMode == 6 { return raidGoal(p) }
         if gameMode == 7 { return frontGoal(p) }
         if gameMode == 5 {
@@ -2130,7 +2161,7 @@ final class TacticalEngine {
         cone.addArc(center: CGPoint(x: cx, y: cy), radius: R, startAngle: .radians(-Double.pi / 2 - 0.5), endAngle: .radians(-Double.pi / 2 + 0.5), clockwise: false)
         cone.closeSubpath()
         g.fill(cone, with: .linearGradient(Gradient(colors: [Color.green.opacity(0.32), Color.green.opacity(0)]), startPoint: CGPoint(x: cx, y: cy), endPoint: CGPoint(x: cx, y: cy - R)))
-        for p in players where p.alive && !p.isPlayer && (p.team == me.team || p.spotted) && TMap.floorOf(p.pos) == rf {
+        for p in players where p.alive && !p.isPlayer && (p.team == me.team || (p.spotted && !p.civ)) && TMap.floorOf(p.pos) == rf {
             let (c, edge) = clamp(P(p.pos.x, p.pos.y))
             let ally = p.team == me.team
             let col: Color = ally ? Color(red: 0.3, green: 0.62, blue: 1) : Color(red: 1, green: 0.28, blue: 0.3)
@@ -2184,6 +2215,7 @@ final class TacticalEngine {
     var enemyAlive: Int { players.filter { $0.team != me.team && $0.alive }.count }
     var objectiveText: String {
         if gameMode == 6 { return contractText }
+        if gameMode == 9 { return "Movement Lab: wall-run, sword-jump, chain slashes" }
         if gameMode == 1 || gameMode == 8 { return "First to \(killTarget) kills" }
         if gameMode == 2 { return "Collect enemy tags, deny yours" }
         if gameMode == 3 { return "Arms Race  \(min(me.ladder + 1, TWeapons.ladder.count))/\(TWeapons.ladder.count)  \(TGuns.get(me.gun).name)" }
@@ -2986,9 +3018,26 @@ struct TacticalPlay: View {
             ZStack {
                 if engine.paused && !engine.over { pauseView }
                 if showControls && engine.paused && !engine.over { ControlsEditorView { showControls = false } }
-                if engine.over { if engine.gameMode == 6 { overView } else { resultsView } }
+                if engine.over {
+                    if engine.gameMode == 6 { overView }
+                    else if engine.gameMode == 10 {
+                        RoamResults(e: engine, hideout: { dismiss() }, again: {
+                            let d = diff
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { nav.tacPlay = d }
+                        })
+                    }
+                    else if engine.gameMode == 9 {
+                        AirbladeLabResults(e: engine, hideout: { dismiss() }, retry: {
+                            let d = diff
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { nav.tacPlay = d }
+                        })
+                    } else { resultsView }
+                }
                 if !engine.me.alive && !engine.over && !engine.paused {
-                    AirbladeDown(e: engine) { showLoadout = true; engine.paused = true }
+                    if engine.gameMode == 10 { RoamDown(e: engine) }
+                    else { AirbladeDown(e: engine) { showLoadout = true; engine.paused = true } }
                 }
                 if engine.gameMode == 6 && !engine.over && engine.me.alive { RaidFX(e: engine) }
                 if engine.raidBagOpen && engine.gameMode == 6 && engine.me.alive && !engine.over { RaidBagPanel(e: engine) }
@@ -3051,7 +3100,7 @@ struct TacticalPlay: View {
                 Button { engine.scores = [0, engine.target]; engine.over = true; engine.won = false; engine.paused = false } label: {
                     HStack(spacing: 8) {
                         SF("flag.fill").font(.system(size: 13, weight: .bold))
-                        Text("FORFEIT MATCH").font(.jk(13, .heavy))
+                        Text(engine.gameMode == 10 ? "LEAVE FREE ROAM" : "FORFEIT MATCH").font(.jk(13, .heavy))
                     }
                     .foregroundColor(TUI.red).frame(width: 340, height: 42).background(Rectangle().fill(TUI.red.opacity(0.14)))
                     .overlay(Rectangle().stroke(TUI.red.opacity(0.45), lineWidth: 1))
@@ -3200,5 +3249,383 @@ extension Game {
         TacLeague.myRating = d.rating
         st.ex.gems += gems
         s = st
+    }
+}
+
+
+// MARK: - Movement Lab (mode 9)
+
+extension TacticalEngine {
+    func labReset() {
+        labShots = 0; labHits = 0; labGoT = 0
+        comboN = 0; comboT = 0; bestCombo = 0; streak = 0; bestStreak = 0; swordKills = 0; airKills = 0; backstabs = 0
+        headKills = 0; bestMulti = 0; multiN = 0; multiT = 0
+    }
+
+    /// accuracy 0...1: swings and shots that landed on a target
+    var labAccuracy: CGFloat { labShots == 0 ? 0 : min(1, CGFloat(labHits) / CGFloat(labShots)) }
+
+    /// score for the run: targets, chains, air kills and accuracy
+    var labScore: Int {
+        me.kills * 100 + bestCombo * 40 + airKills * 60 + Int(labAccuracy * 200)
+    }
+
+    func labTick(_ dt: CGFloat) { labGoT += dt }
+
+    /// place the player at the west edge, a target on the ring far from everyone else
+    func labPlace(_ p: TPlayer) {
+        p.hp = 100; p.armor = 0; p.alive = true; p.blind = 0; p.crouch = false
+        p.path = []; p.targetID = -1; p.hunt = 0; p.reloadT = 0; p.fireCd = 0; p.hiding = false; p.cover = nil
+        p.nades = 0; p.smokes = 0; p.flashes = 0
+        if p.isPlayer {
+            let home = TMap.atkSpawn[min(2, TMap.atkSpawn.count - 1)]
+            p.pos = home
+            p.aim = TMap.aimAtCenter(home)
+            setGun(p, myGun)
+            p.altGun = TacticalEngine.altFor(p.gun)
+            p.altMag = magSize(p, p.altGun)
+            p.altSpare = 99
+            scoped = false; ads = false; pitch = 0
+        } else {
+            let others = players.filter { $0.alive && $0.id != p.id }.map { $0.pos }
+            let ring = TMap.spawns.shuffled()
+            let spot = ring.first { c in others.allSatisfy { tDist(c, $0) > 260 } } ?? ring[0]
+            p.pos = spot
+            p.aim = TMap.aimAtCenter(spot)
+            setGun(p, "pistol")
+        }
+        p.knife = true
+    }
+}
+
+// MARK: - Free Roam (mode 10): open streets, pedestrians, rival crews, fists, street jobs
+
+extension TacticalEngine {
+
+    func roamSetup() {
+        roam = RoamState()
+        roam.pool = TMap.spreadPoints(70, sep: 180)
+        if roam.pool.isEmpty { roam.pool = TMap.spawns }
+        roam.hideout = TMap.atkSpawn[min(2, TMap.atkSpawn.count - 1)]
+        var homes: [CGPoint] = []
+        for c in roam.pool.shuffled() where tDist(c, roam.hideout) > 1000 && homes.allSatisfy({ tDist($0, c) > 1100 }) {
+            homes.append(c)
+            if homes.count == 2 { break }
+        }
+        while homes.count < 2 { homes.append(roam.pool.randomElement() ?? roam.hideout) }
+        roam.homes = homes
+        for p in players where !p.isPlayer {
+            let i = p.id - 1
+            if i < 10 {
+                p.civ = true; p.team = 1; p.crew = 0
+                p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana"][i]
+                p.handle = p.name.lowercased()
+            } else {
+                p.civ = false; p.team = 1
+                p.crew = i < 14 ? 1 : 2
+                p.tier = (i == 13 || i == 16) ? 1 : (i == 17 ? 2 : 0)
+                if p.tier == 2 { p.name = "RAZOR"; p.handle = "razor"; roam.bossID = p.id }
+                p.home = homes[p.crew - 1]
+            }
+        }
+        roam.offers = roamOffers()
+    }
+
+    private func roamHP(_ p: TPlayer) -> CGFloat {
+        if p.isPlayer { return 100 }
+        if p.civ { return 60 }
+        return [100, 170, 280][min(2, p.tier)]
+    }
+
+    func roamPlace(_ p: TPlayer) {
+        p.hp = roamHP(p); p.armor = 0; p.alive = true; p.blind = 0; p.crouch = false
+        p.path = []; p.targetID = -1; p.hunt = 0; p.reloadT = 0; p.fireCd = 0; p.hiding = false; p.cover = nil
+        p.nades = 0; p.smokes = 0; p.flashes = 0; p.stun = 0; p.goalT = 0; p.roam = .zero
+        p.z = 0; p.vz = 0; p.knock = .zero
+        if p.isPlayer {
+            p.pos = roam.hideout
+            p.aim = TMap.aimAtCenter(roam.hideout)
+            setGun(p, myGun)
+            p.altGun = TacticalEngine.altFor(p.gun)
+            p.altMag = magSize(p, p.altGun)
+            p.altSpare = 99
+            scoped = false; ads = false; pitch = 0
+            roam.step = 0; roam.comboT = 0
+            if roam.job == nil { roam.offers = roamOffers() }
+        } else if p.civ {
+            let me0 = me.pos
+            let spot = roam.pool.filter { tDist($0, me0) > 380 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
+            p.pos = spot
+            p.aim = CGFloat.random(in: 0...(2 * CGFloat.pi))
+            setGun(p, "pistol")
+        } else {
+            let near = roam.pool.filter { tDist($0, p.home) < 260 }
+            p.pos = near.randomElement() ?? p.home
+            p.aim = CGFloat.random(in: 0...(2 * CGFloat.pi))
+            setGun(p, "pistol")
+        }
+        p.knife = true
+    }
+
+    /// crew members patrol around their corner; pedestrians are handled in roamTick
+    func roamGoal(_ p: TPlayer) -> CGPoint {
+        if p.roam == .zero || tDist(p.pos, p.roam) < 50 || Int.random(in: 0..<500) == 0 {
+            let c = roam.pool.filter { tDist($0, p.home) < 420 }
+            p.roam = c.randomElement() ?? p.home
+        }
+        return p.roam
+    }
+
+    @discardableResult
+    private func roamWalk(_ p: TPlayer, to dest: CGPoint, speed: CGFloat, dt: CGFloat) -> Bool {
+        p.pathT -= dt
+        if p.pathT <= 0 || tDist(dest, p.pathDest) > 90 {
+            p.path = TNav.path(p.pos, dest)
+            p.pathDest = dest
+            p.pathT = CGFloat.random(in: 0.8...1.4)
+        }
+        while let f = p.path.first, tDist(p.pos, f) < 14 { p.path.removeFirst() }
+        guard let nxt = p.path.first else { return tDist(p.pos, dest) < 40 }
+        let a = atan2(nxt.y - p.pos.y, nxt.x - p.pos.x)
+        p.pos.x += cos(a) * speed * dt
+        p.pos.y += sin(a) * speed * dt
+        TMap.push(&p.pos, 14)
+        p.aim += max(-5 * dt, min(5 * dt, tAngDiff(a, p.aim)))
+        return tDist(p.pos, dest) < 26
+    }
+
+    func roamTick(_ dt: CGFloat) {
+        roam.comboT = max(0, roam.comboT - dt)
+        if roam.comboT == 0 { roam.step = 0 }
+        roam.swingT = max(0, roam.swingT - dt)
+        roam.bestCombo = max(roam.bestCombo, bestCombo)
+        let mePos = me.pos
+        for p in players where !p.isPlayer {
+            if p.stun > 0 { p.stun -= dt }
+            guard p.alive else { continue }
+            if p.civ {
+                civTick(p, dt, mePos)
+            } else if tDist(p.pos, p.home) > 1100 && p.targetID >= 0 {
+                // don't chase across the whole town: go back to the corner
+                p.targetID = -1; p.hunt = 0; p.roam = .zero
+            }
+        }
+        jobTick(dt)
+    }
+
+    private func civTick(_ p: TPlayer, _ dt: CGFloat, _ mePos: CGPoint) {
+        if p.stun > 0 { return }
+        // a fight nearby scares them
+        if p.hunt <= 0 && me.noiseT > 0 && me.alive && tDist(p.pos, mePos) < 230 {
+            p.hunt = 3; p.lastSeen = mePos
+        }
+        if p.hunt > 0 {
+            p.hunt -= dt
+            let ax = p.pos.x - p.lastSeen.x, ay = p.pos.y - p.lastSeen.y
+            let want = CGPoint(x: p.pos.x + ax * 8, y: p.pos.y + ay * 8)
+            if p.pathT <= 0 || p.roam == .zero {
+                p.roam = roam.pool.min(by: { tDist($0, want) < tDist($1, want) }) ?? p.pos
+            }
+            roamWalk(p, to: p.roam, speed: 150, dt: dt)
+            return
+        }
+        if p.goalT > 0 {
+            p.goalT -= dt
+            p.aim += sin(time * 0.8 + CGFloat(p.id)) * dt * 0.5
+            return
+        }
+        if p.roam == .zero {
+            p.roam = roam.pool.filter { tDist($0, p.pos) < 700 && tDist($0, p.pos) > 120 }.randomElement() ?? p.pos
+        }
+        if roamWalk(p, to: p.roam, speed: 52, dt: dt) {
+            p.goalT = CGFloat.random(in: 2...6)
+            p.roam = .zero
+        }
+    }
+
+    // MARK: fists
+
+    func brawl(_ p: TPlayer) {
+        let isMe = p.isPlayer
+        let air = isMe && pz > TMove.minAirZ * 2
+        var step = 0
+        if isMe {
+            step = roam.comboT > 0 ? (roam.step + 1) % 3 : 0
+            roam.step = step
+            roam.comboT = 0.7
+            roam.swingT = 0.28
+        }
+        let heavy = step == 2 || air
+        p.fireCd = isMe ? (heavy ? 0.5 : 0.26) : 0.85
+        p.flash = 0.06
+        p.noiseT = 0.8
+        let reach: CGFloat = isMe ? (heavy ? 72 : 62) : 58
+        var best: TPlayer? = nil
+        var bd = reach
+        for v in players where v.alive && v.team != p.team && v.id != p.id {
+            let d = tDist(p.pos, v.pos)
+            guard d < bd else { continue }
+            let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
+            guard abs(tAngDiff(ang, p.aim)) < 1.0, TMap.los(p.pos, v.pos) else { continue }
+            guard abs(v.z - p.z) < 56 else { continue }
+            bd = d
+            best = v
+        }
+        let aimX = cos(p.aim), aimY = sin(p.aim)
+        if isMe {
+            // step into the punch
+            pvel.dx += aimX * (best == nil ? 60 : 90)
+            pvel.dy += aimY * (best == nil ? 60 : 90)
+        }
+        guard let v = best else { return }
+        var dmg: CGFloat
+        if isMe {
+            dmg = [11, 12, 21][step]
+            if air { dmg = 26 }
+            if dashT > 0 { dmg *= 1.5 }
+        } else {
+            dmg = [6, 9, 12][min(2, p.tier)]
+        }
+        let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
+        let behind = abs(tAngDiff(v.aim, ang)) < 1.1
+        if isMe && behind && !v.civ { dmg *= 1.25 }
+        knifeKill = true
+        damage(v, dmg, by: p.id)
+        knifeKill = false
+        let kd = max(0.001, tDist(p.pos, v.pos))
+        let kn = CGVector(dx: (v.pos.x - p.pos.x) / kd, dy: (v.pos.y - p.pos.y) / kd)
+        let force: CGFloat = heavy ? 360 : 130
+        if v.isPlayer {
+            pvel.dx += kn.dx * force; pvel.dy += kn.dy * force
+            shake = max(shake, 6)
+        } else {
+            v.knock = CGVector(dx: kn.dx * force, dy: kn.dy * force)
+            v.stun = max(v.stun, heavy ? 0.7 : 0.15)
+        }
+        if isMe {
+            shake = max(shake, heavy ? 7 : 2.5)
+            if v.alive {
+                if air { pop(v.pos, "AIR KICK", TUI.gold) }
+                else if step == 2 { pop(v.pos, "FINISHER", TUI.gold) }
+                else if dashT > 0 { pop(v.pos, "RUSH", TUI.gold) }
+            }
+        }
+    }
+
+    // MARK: hits, KOs, cash
+
+    func roamHurt(_ v: TPlayer, by owner: Int) {
+        guard v.civ, v.alive, let o = players.first(where: { $0.id == owner }) else { return }
+        v.hunt = 5
+        v.lastSeen = o.pos
+        v.roam = .zero
+        v.pathT = 0
+    }
+
+    func roamKilled(_ v: TPlayer, killer: TPlayer?) {
+        if v.isPlayer {
+            let loss = Int(CGFloat(roam.cash) * 0.15)
+            roam.cash -= loss
+            roam.step = 0; roam.comboT = 0
+            if let j = roam.job, j.kind == .drop { roamFail("YOU WENT DOWN") }
+            return
+        }
+        guard killer?.isPlayer == true else { return }
+        var pay = 0
+        if v.civ {
+            roam.civKOs += 1
+            pay = Int.random(in: 8...35)
+        } else {
+            roam.crewKOs += 1
+            pay = [60, 120, 400][min(2, v.tier)]
+            if var j = roam.job {
+                if j.kind == .turf { j.got += 1; roam.job = j; if j.got >= j.need { roamComplete(); } }
+                else if j.kind == .boss && v.id == roam.bossID { roamComplete() }
+            }
+        }
+        roam.cash += pay
+        callout = v.tier == 2 ? "BOSS DOWN" : "K.O."
+        calloutSub = "\(v.name)  ·  +$\(pay)"
+        calloutT = 2.0
+        calloutSerial += 1
+    }
+
+    // MARK: jobs
+
+    var roamMarker: CGPoint? {
+        guard let j = roam.job else { return nil }
+        switch j.kind {
+        case .drop: return j.stage < j.pts.count ? j.pts[j.stage] : nil
+        case .boss: return players.first(where: { $0.id == roam.bossID && $0.alive })?.pos
+        case .turf:
+            let c = players.filter { $0.alive && !$0.civ && !$0.isPlayer }
+            return c.min(by: { tDist($0.pos, me.pos) < tDist($1.pos, me.pos) })?.pos
+        }
+    }
+
+    var roamObjectiveText: String {
+        guard let j = roam.job else { return "" }
+        switch j.kind {
+        case .drop: return j.stage == 0 ? "Pick up the package" : "Deliver it before time runs out"
+        case .boss: return players.first(where: { $0.id == roam.bossID })?.alive == true ? "Find RAZOR and put him down" : "RAZOR is regrouping…"
+        case .turf: return "Knock out crew members  \(j.got) / \(j.need)"
+        }
+    }
+
+    func roamOffers() -> [RoamJob] {
+        let a = roam.pool.filter { tDist($0, me.pos) > 700 && tDist($0, me.pos) < 1800 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
+        let b = roam.pool.filter { tDist($0, a) > 1200 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
+        var drop = RoamJob(id: roam.jobsDone * 3 + 1, kind: .drop, title: "DEAD DROP", brief: "Grab a package across town and deliver it. The clock is running.", reward: 450)
+        drop.pts = [a, b]; drop.timeLeft = 150
+        var turf = RoamJob(id: roam.jobsDone * 3 + 2, kind: .turf, title: "TURF WAR", brief: "Knock out 5 crew members. Both crews count.", reward: 650)
+        turf.need = 5
+        let boss = RoamJob(id: roam.jobsDone * 3 + 3, kind: .boss, title: "TAKE DOWN RAZOR", brief: "Viper Row's boss is tough. Bring your combos.", reward: 1100)
+        return [drop, turf, boss]
+    }
+
+    func roamAccept(_ j: RoamJob) {
+        roam.job = j
+        roam.jobsOpen = false
+        if j.kind == .boss, let b = players.first(where: { $0.id == roam.bossID }), !b.alive { b.respawn = 0.1 }
+        banner = j.title
+        bannerT = 2
+    }
+
+    func roamAbandon() {
+        roam.job = nil
+        banner = "JOB DROPPED"
+        bannerT = 1.5
+    }
+
+    private func roamComplete() {
+        guard let j = roam.job else { return }
+        roam.cash += j.reward
+        roam.jobsDone += 1
+        roam.job = nil
+        roam.offers = roamOffers()
+        banner = "JOB COMPLETE  +$\(j.reward)"
+        bannerT = 3
+        pop(me.pos, "+$\(j.reward)", TUI.gold)
+    }
+
+    private func roamFail(_ why: String) {
+        roam.jobsFailed += 1
+        roam.job = nil
+        roam.offers = roamOffers()
+        banner = "JOB FAILED  ·  \(why)"
+        bannerT = 3
+    }
+
+    private func jobTick(_ dt: CGFloat) {
+        guard var j = roam.job, j.kind == .drop, me.alive else { return }
+        j.timeLeft -= dt
+        if j.stage < j.pts.count, tDist(me.pos, j.pts[j.stage]) < 60 {
+            j.stage += 1
+            if j.stage >= j.pts.count { roam.job = j; roamComplete(); return }
+            banner = "PACKAGE SECURED"
+            bannerT = 2
+        }
+        roam.job = j
+        if j.timeLeft <= 0 { roamFail("OUT OF TIME") }
     }
 }

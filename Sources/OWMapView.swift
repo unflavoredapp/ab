@@ -17,9 +17,18 @@ struct OWDistrict: Identifiable {
     let contract: CGPoint?
     let house: CGPoint?
 
+    /// the districts with live control from the shared world state
+    static var all: [OWDistrict] {
+        base.map { d in
+            let c = OWWorld.shared.control(d.id, base: d.control)
+            return OWDistrict(id: d.id, name: d.name, control: c, owner: OWWorld.owner(c), poly: d.poly, label: d.label, income: d.income,
+                              safehouses: d.safehouses, contracts: d.contracts, enemies: d.enemies, contract: d.contract, house: d.house)
+        }
+    }
+
     var color: Color { owner == .yours ? OW.cyan : (owner == .enemy ? OW.red : OW.gold) }
 
-    static let all: [OWDistrict] = [
+    static let base: [OWDistrict] = [
         OWDistrict(id: 0, name: "RIVERSIDE", control: 68, owner: .yours,
                    poly: [CGPoint(x: 0.13, y: 0.45), CGPoint(x: 0.27, y: 0.33), CGPoint(x: 0.43, y: 0.36), CGPoint(x: 0.40, y: 0.55), CGPoint(x: 0.24, y: 0.62), CGPoint(x: 0.13, y: 0.56)],
                    label: CGPoint(x: 0.27, y: 0.44), income: 3200, safehouses: (1, 1), contracts: (2, 4), enemies: 0,
@@ -53,6 +62,7 @@ struct OWMapView: View {
     let act: (LobbyAct) -> Void
 
     @State private var pick = 4
+    @State private var cam = CityCam()
     @State private var showYours = true
     @State private var showCrew = false
     @State private var showEnemy = true
@@ -273,9 +283,14 @@ struct OWMapView: View {
             infoRow("flame.fill", "Enemy Crews", "\(d.enemies)", OW.red)
             Text("CREW ACTIVITY").font(.jk(9 * u, .heavy)).foregroundColor(.white).padding(.top, 2 * u)
             feedRow("Shadow", "Your crew captured this territory", "2h ago")
-            feedRow("Rival", "Rival crew started a contract", "4h ago")
-            feedRow("Rico", "Your crew completed a contract", "6h ago")
-            OWButton(u: u, icon: "flag.2.crossed.fill", title: "LAUNCH TERRITORY WAR", sub: "Prepare your crew and take control.") { act(.launch(5)) }
+            OWButton(u: u, icon: "doc.text.fill", title: "TAKE CONTRACT", sub: "Free Roam job in \(d.name.capitalized).") {
+                OWWorld.pending = OWWorld.Pending(district: d.id, capture: false, kind: .drop)
+                act(.launch(10))
+            }
+            OWButton(u: u, icon: "flag.2.crossed.fill", title: d.owner == .yours ? "DEFEND TERRITORY" : "LAUNCH TERRITORY WAR", sub: "Win the fight to take control.") {
+                OWWorld.pending = OWWorld.Pending(district: d.id, capture: d.owner != .yours, kind: .turf)
+                act(.launch(10))
+            }
         }
         .padding(8 * u).frame(width: 182 * u).owPanel(u)
     }
@@ -309,11 +324,11 @@ struct OWMapView: View {
         VStack(spacing: 3 * u) {
             Image(systemName: "location.north.fill").font(.system(size: 12 * u)).foregroundColor(OW.cyan)
                 .frame(width: 30 * u, height: 30 * u).background(Circle().fill(OW.panel)).overlay(Circle().stroke(OW.edge, lineWidth: 1))
-            tool("sf:plus") { zoom = min(3, zoom + 0.2); pinchBase = zoom }
-            tool("sf:minus") { zoom = max(0.7, zoom - 0.2); pinchBase = zoom }
+            tool("sf:plus") { zoom = min(3, zoom + 0.2); pinchBase = zoom; cam.dist = max(30, cam.dist * 0.72) }
+            tool("sf:minus") { zoom = max(0.7, zoom - 0.2); pinchBase = zoom; cam.dist = min(900, cam.dist / 0.72) }
             tool("3D", !flat) { flat = false }
             tool("2D", flat) { flat = true }
-            tool("sf:scope") { zoom = 1; pinchBase = 1; pan = .zero; panBase = .zero; rot = 0; rotBase = 0; pick = 4 }
+            tool("sf:scope") { zoom = 1; pinchBase = 1; pan = .zero; panBase = .zero; rot = 0; rotBase = 0; pick = 4; cam.yaw = 0.5; cam.focus(OWDistrict.all[4].label, dist: 520) }
         }
     }
 
@@ -335,7 +350,10 @@ struct OWMapView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            mapCanvas.padding(.top, 44 * u)
+            Group {
+                if flat { mapCanvas } else { OWCityMapLayer(cam: cam, pick: $pick, u: u, visible: visible) }
+            }
+            .padding(.top, 44 * u)
             VStack(spacing: 0) {
                 LobbyTopBar(t: t, u: u, selected: 1, act: act)
                 Spacer()
@@ -348,5 +366,6 @@ struct OWMapView: View {
         }
         .frame(width: size.width, height: size.height)
         .background(Color(red: 0.01, green: 0.03, blue: 0.07))
+        .onChange(of: pick) { _ in cam.focus(OWDistrict.all[pick].label, dist: min(cam.dist, 260)) }
     }
 }

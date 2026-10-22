@@ -14,16 +14,10 @@ struct OWCrewView: View {
     private var u: CGFloat { min(size.width / 1024, size.height / 470) }
 
     private struct Member { let name: String; let lv: Int; let role: String; let status: Int; let last: String }
-    private let members = [
-        Member(name: "MRZEFV", lv: 12, role: "Leader", status: 0, last: "Now"),
-        Member(name: "RicoStacks", lv: 11, role: "Officer", status: 0, last: "2m ago"),
-        Member(name: "ShadowK", lv: 10, role: "Officer", status: 0, last: "5m ago"),
-        Member(name: "LunaZ", lv: 9, role: "Member", status: 1, last: "12m ago"),
-        Member(name: "TacoBandit", lv: 8, role: "Member", status: 0, last: "16m ago"),
-        Member(name: "GhostRider", lv: 7, role: "Member", status: 2, last: "1h ago"),
-        Member(name: "BigDre", lv: 6, role: "Member", status: 2, last: "3h ago"),
-        Member(name: "KillaBee", lv: 5, role: "Recruit", status: 2, last: "5h ago"),
-    ]
+    @ObservedObject private var online = OWOnline.shared
+    @State private var draft = ""
+    @State private var serverText = OWOnline.shared.baseURL
+    private var members: [Member] { online.members.map { Member(name: $0.name, lv: $0.level, role: $0.role, status: $0.status, last: $0.last) } }
 
     private func roleIcon(_ r: String) -> String {
         ["Leader": "crown.fill", "Officer": "shield.lefthalf.filled", "Member": "person.2.fill", "Recruit": "plus.circle.fill"][r] ?? "person.fill"
@@ -77,7 +71,7 @@ struct OWCrewView: View {
                 Capsule().fill(OW.cyan).frame(width: 188 * u * CGFloat(TacRank.progress(xp)))
             }
             .frame(width: 188 * u, height: 4 * u)
-            statRow("person.2.fill", "MEMBERS", "8 / 12")
+            statRow("person.2.fill", "MEMBERS", "\(online.members.count) / 12")
             statRow("shield.lefthalf.filled", "TERRITORY", "Riverside District")
             statRow("building.columns.fill", "CREW BANK", "$ 248,560")
         }
@@ -127,7 +121,7 @@ struct OWCrewView: View {
                 Button { tab = i } label: {
                     HStack(spacing: 4 * u) {
                         Text(s).font(.jk(10 * u, .heavy)).foregroundColor(tab == i ? OW.cyan : .white.opacity(0.75))
-                        if i == 1 { Text("3").font(.jk(7 * u, .heavy)).foregroundColor(.white).frame(width: 12 * u, height: 12 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }
+                        if i == 1 && !online.requests.isEmpty { Text("\(online.requests.count)").font(.jk(7 * u, .heavy)).foregroundColor(.white).frame(width: 12 * u, height: 12 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }
                     }
                     .frame(height: 24 * u).overlay(alignment: .bottom) { Rectangle().fill(tab == i ? OW.cyan : .clear).frame(height: 2 * u) }
                 }.buttonStyle(.plain)
@@ -183,11 +177,62 @@ struct OWCrewView: View {
                 .font(.jk(7 * u, .semibold)).foregroundColor(.white.opacity(0.5)).padding(.horizontal, 8 * u).frame(height: 18 * u)
                 VStack(spacing: 0) { ForEach(0..<members.count, id: \.self) { memberRow($0) } }.padding(.horizontal, 2 * u)
                 Spacer(minLength: 0)
+            } else if tab == 1 {
+                ScrollView {
+                    VStack(spacing: 3 * u) {
+                        if online.requests.isEmpty { Text("No pending requests.").font(.jk(10 * u, .medium)).foregroundColor(.white.opacity(0.5)).padding(.top, 30 * u) }
+                        ForEach(online.requests) { r in
+                            HStack(spacing: 7 * u) {
+                                OWAvatar(name: r.name, s: 24 * u)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(r.name).font(.jk(10 * u, .heavy)).foregroundColor(.white)
+                                    Text("Lv. \(r.level) · \(r.last)").font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.6))
+                                }
+                                Spacer()
+                                Button { online.respond(r, accept: true) } label: { Text("ACCEPT").font(.jk(8 * u, .heavy)).foregroundColor(.black).padding(.horizontal, 9 * u).frame(height: 20 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }.buttonStyle(.plain)
+                                Button { online.respond(r, accept: false) } label: { Text("DECLINE").font(.jk(8 * u, .heavy)).foregroundColor(.white).padding(.horizontal, 9 * u).frame(height: 20 * u).owPanel(u, r: 2) }.buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 8 * u).frame(height: 32 * u)
+                        }
+                    }.padding(4 * u)
+                }
+            } else if tab == 2 {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4 * u) {
+                        ForEach(online.chat.suffix(40)) { m in
+                            HStack(alignment: .top, spacing: 6 * u) {
+                                OWAvatar(name: m.from, s: 16 * u)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(m.from).font(.jk(7.5 * u, .heavy)).foregroundColor(m.from == online.playerName ? OW.cyan : .white)
+                                    Text(m.text).font(.jk(9 * u, .medium)).foregroundColor(.white.opacity(0.9))
+                                }
+                            }
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(8 * u)
+                }
+                HStack(spacing: 5 * u) {
+                    TextField("Message your crew", text: $draft).font(.jk(9 * u, .medium)).foregroundColor(.white)
+                        .padding(.horizontal, 7 * u).frame(height: 22 * u).owPanel(u, r: 2)
+                        .onSubmit { online.send(draft); draft = "" }
+                    Button { online.send(draft); draft = "" } label: { Image(systemName: "paperplane.fill").font(.system(size: 10 * u)).foregroundColor(.black).frame(width: 30 * u, height: 22 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }.buttonStyle(.plain)
+                }.padding(6 * u)
             } else {
-                Spacer()
-                Text(["", "3 join requests will show up here.", "Crew chat needs online play.", "No crew logs yet."][tab])
-                    .font(.jk(10 * u, .medium)).foregroundColor(.white.opacity(0.5))
-                Spacer()
+                VStack(alignment: .leading, spacing: 5 * u) {
+                    HStack(spacing: 5 * u) {
+                        Circle().fill(online.connected ? OW.green : OW.gold).frame(width: 7 * u, height: 7 * u)
+                        Text(online.status).font(.jk(9 * u, .heavy)).foregroundColor(.white)
+                    }
+                    Text("SERVER ADDRESS").font(.jk(7 * u, .semibold)).foregroundColor(.white.opacity(0.5))
+                    HStack(spacing: 5 * u) {
+                        TextField("http://192.168.1.20:8080", text: $serverText).font(.jk(9 * u, .medium)).foregroundColor(.white)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                            .padding(.horizontal, 7 * u).frame(height: 22 * u).owPanel(u, r: 2)
+                        Button { online.baseURL = serverText; online.connect() } label: { Text("CONNECT").font(.jk(8 * u, .heavy)).foregroundColor(.black).padding(.horizontal, 10 * u).frame(height: 22 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }.buttonStyle(.plain)
+                    }
+                    Text("Leave it empty to play offline. The reference server is in the server folder.").font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.55))
+                    ScrollView { VStack(alignment: .leading, spacing: 1 * u) { ForEach(Array(online.logs.enumerated()), id: \.offset) { _, l in Text(l).font(.jk(7 * u, .medium)).foregroundColor(.white.opacity(0.6)) } } }
+                }.padding(10 * u)
+                Spacer(minLength: 0)
             }
         }
         .frame(maxHeight: .infinity).owPanel(u)
@@ -272,5 +317,6 @@ struct OWCrewView: View {
             .padding(.horizontal, 12 * u).padding(.top, 8 * u).padding(.bottom, 8 * u)
         }
         .frame(width: size.width, height: size.height)
+        .onAppear { online.connect() }
     }
 }

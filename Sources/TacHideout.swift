@@ -6,7 +6,7 @@ struct AirbladeLogo: View {
 
     var body: some View {
         ZStack {
-            Text("AIRBLADE")
+            Text("HOODBLOK")
                 .font(.system(size: size, weight: .black, design: .default).italic())
                 .tracking(size * 0.02)
                 .foregroundStyle(LinearGradient(colors: [.white, Color(white: 0.9), Color(white: 0.68)], startPoint: .top, endPoint: .bottom))

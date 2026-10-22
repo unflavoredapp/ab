@@ -26,6 +26,7 @@ struct MainShotApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var game = Game()
     @StateObject private var nav = Nav()
+    @State private var signedIn = UserDefaults.standard.bool(forKey: "ab.loggedin")
 
     init() {
         for sub in [nil, "Fonts"] as [String?] {
@@ -37,11 +38,17 @@ struct MainShotApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LobbyView()
-                .environmentObject(game)
-                .environmentObject(nav)
-                .preferredColorScheme(.dark)
-                .dynamicTypeSize(.large)
+            ZStack {
+                LobbyView()
+                    .environmentObject(game)
+                    .environmentObject(nav)
+                if !signedIn {
+                    HoodLogin { withAnimation(.easeInOut(duration: 0.4)) { signedIn = true } }
+                        .transition(.opacity)
+                }
+            }
+            .preferredColorScheme(.dark)
+            .dynamicTypeSize(.large)
         }
     }
 }

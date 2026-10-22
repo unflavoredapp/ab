@@ -323,6 +323,8 @@ final class TPlayer {
     var crew = 0
     var tier = 0
     var stun: CGFloat = 0
+    /// Free Roam weapon in hand: 0 fists, 1 bat, 2 pistol
+    var arm = 0
     var path: [CGPoint] = []
     var pathT: CGFloat = 0
     var pathDest = CGPoint.zero
@@ -1342,7 +1344,7 @@ final class TacticalEngine {
         pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN
         p.z = pz
         p.fireCd -= dt
-        if wantReload { wantReload = false; startReload(p) }
+        if wantReload { wantReload = false; if gameMode == 10 { roamReload() } else { startReload(p) } }
         if wantSlash { wantSlash = false; if p.alive && p.fireCd <= 0 { slash(p, blade: true); swordJump(p) } }
         if wantSwap { wantSwap = false; swapGun(p) }
         if wantKnife { wantKnife = false; if !p.knife { p.knife = true; p.reloadT = 0; scoped = false; ads = false; p.fireCd = max(p.fireCd, 0.12) } }
@@ -1943,7 +1945,8 @@ final class TacticalEngine {
             if p.knife && e.z - p.z > 28 && d < 150 && p.z <= 0.5 && Double.random(in: 0...1) < Double(dt) * 6 { p.vz = 300 }
             if p.reactT <= 0 && abs(df) < 0.14 && p.fireCd <= 0 && p.reloadT <= 0 && p.mag > 0 {
                 if p.knife {
-                    if d < 92 { slash(p, blade: true) }
+                    if gameMode == 10 && p.arm == 2 && d >= 80 && d < 380 { crewShoot(p, e) }
+                    else if d < 92 { slash(p, blade: true) }
                 } else if d < (gameMode == 8 ? 84 : 46) && Int.random(in: 0..<100) < 70 { slash(p, blade: gameMode == 8) } else { shoot(p, aimErr[diff]) }
             }
             if p.nades > 0 && d > 220 && TMap.floorOf(e.pos) == TMap.floorOf(p.pos) && Double.random(in: 0...1) < Double(dt) * 0.12 {
@@ -1951,7 +1954,7 @@ final class TacticalEngine {
             }
             if p.holding && tDist(p.pos, p.ambushPos) < 60 { p.crouch = true; return }
             let pc = TWeapons.cls(p.gun)
-            let pref: CGFloat = p.knife ? 40 : (pc == "shotgun" ? 200 : (pc == "smg" ? 320 : (pc == "rifle" ? 460 : (pc == "sniper" ? 700 : 380)))) * (1.2 - 0.5 * p.aggro)
+            let pref: CGFloat = p.knife ? (gameMode == 10 ? (p.arm == 2 ? 250 : (p.arm == 1 ? 55 : 40)) : 40) : (pc == "shotgun" ? 200 : (pc == "smg" ? 320 : (pc == "rifle" ? 460 : (pc == "sniper" ? 700 : 380)))) * (1.2 - 0.5 * p.aggro)
             p.strafeT -= dt
             if p.strafeT <= 0 { p.strafe = Bool.random() ? 1 : -1; p.strafeT = CGFloat.random(in: 0.35...1.8) * p.patience }
             p.hideT -= dt
@@ -3304,6 +3307,7 @@ extension TacticalEngine {
 
     func roamSetup() {
         roam = RoamState()
+        roam.owned = RoamState.loadOwned()
         roam.pool = TMap.spreadPoints(70, sep: 180)
         if roam.pool.isEmpty { roam.pool = TMap.spawns }
         roam.hideout = TMap.atkSpawn[min(2, TMap.atkSpawn.count - 1)]
@@ -3324,11 +3328,60 @@ extension TacticalEngine {
                 p.civ = false; p.team = 1
                 p.crew = i < 14 ? 1 : 2
                 p.tier = (i == 13 || i == 16) ? 1 : (i == 17 ? 2 : 0)
+                roamArm(p)
                 if p.tier == 2 { p.name = "RAZOR"; p.handle = "razor"; roam.bossID = p.id }
                 p.home = homes[p.crew - 1]
             }
         }
         roam.offers = roamOffers()
+        if let pd = OWWorld.pending {
+            OWWorld.pending = nil
+            roam.startDistrict = pd.district
+            let c = OWWorld.townPoint(pd.district)
+            let inD = roam.pool.filter { OWWorld.districtAt($0) == pd.district }
+            let area = inD.isEmpty ? roam.pool : inD
+            let spawn = area.min(by: { tDist($0, c) < tDist($1, c) }) ?? c
+            roam.startPos = spawn
+            // a crew corner in the same district, a short walk away
+            if let h = area.filter({ tDist($0, spawn) > 450 }).randomElement() ?? area.last {
+                roam.homes[0] = h
+                for p in players where p.crew == 1 { p.home = h }
+            }
+            roam.job = roamPendingJob(pd, spawn: spawn)
+        }
+    }
+
+    private func roamPendingJob(_ pd: OWWorld.Pending, spawn: CGPoint) -> RoamJob {
+        let d = OWDistrict.base[pd.district]
+        if pd.capture {
+            var j = RoamJob(id: 900, kind: .turf, title: "TERRITORY WAR: \(d.name)", brief: "Take the district.", reward: max(300, d.income / 5))
+            j.need = 6; j.district = d.id; j.capture = true
+            return j
+        }
+        switch pd.kind {
+        case .drop:
+            let other = roam.pool.filter { OWWorld.districtAt($0) != d.id && tDist($0, spawn) > 1000 }.randomElement() ?? roam.pool.randomElement() ?? spawn
+            var j = RoamJob(id: 901, kind: .drop, title: "DEAD DROP: \(d.name)", brief: "Deliver across town.", reward: 450)
+            j.pts = [spawn, other]; j.timeLeft = 170; j.district = d.id
+            return j
+        case .boss:
+            var j = RoamJob(id: 902, kind: .boss, title: "TAKE DOWN RAZOR", brief: "Put the boss down.", reward: 1100)
+            j.district = d.id
+            if let b = players.first(where: { $0.id == roam.bossID }) { b.home = roam.homes[0] }
+            return j
+        case .turf:
+            var j = RoamJob(id: 903, kind: .turf, title: "TURF WAR: \(d.name)", brief: "Clear the corner.", reward: 650)
+            j.need = 5; j.district = d.id
+            return j
+        }
+    }
+
+    /// shared map state: crew KOs win ground, hurting bystanders loses it
+    private func roamControl(_ id: Int, _ delta: Int) {
+        let r = OWWorld.shared.add(id, delta)
+        let name = OWDistrict.base[id].name
+        if r.old < 55 && r.new >= 55 { banner = "TERRITORY CAPTURED  ·  \(name)"; bannerT = 3.5 }
+        else if r.old > 35 && r.new <= 35 { banner = "TERRITORY LOST  ·  \(name)"; bannerT = 3.5 }
     }
 
     private func roamHP(_ p: TPlayer) -> CGFloat {
@@ -3343,8 +3396,9 @@ extension TacticalEngine {
         p.nades = 0; p.smokes = 0; p.flashes = 0; p.stun = 0; p.goalT = 0; p.roam = .zero
         p.z = 0; p.vz = 0; p.knock = .zero
         if p.isPlayer {
-            p.pos = roam.hideout
-            p.aim = TMap.aimAtCenter(roam.hideout)
+            p.pos = roam.startPos ?? roam.hideout
+            roam.startPos = nil
+            p.aim = TMap.aimAtCenter(p.pos)
             setGun(p, myGun)
             p.altGun = TacticalEngine.altFor(p.gun)
             p.altMag = magSize(p, p.altGun)
@@ -3363,6 +3417,7 @@ extension TacticalEngine {
             p.pos = near.randomElement() ?? p.home
             p.aim = CGFloat.random(in: 0...(2 * CGFloat.pi))
             setGun(p, "pistol")
+            roamArm(p)
         }
         p.knife = true
     }
@@ -3398,7 +3453,18 @@ extension TacticalEngine {
         roam.comboT = max(0, roam.comboT - dt)
         if roam.comboT == 0 { roam.step = 0 }
         roam.swingT = max(0, roam.swingT - dt)
+        me.arm = roam.weapon
+        for i in roam.feed.indices { roam.feed[i].life -= dt }
+        roam.feed.removeAll { $0.life <= 0 }
+        if roam.reloadT > 0 {
+            roam.reloadT -= dt
+            if roam.reloadT <= 0 {
+                let n = min(RoamState.magSize - roam.ammo, roam.reserve)
+                roam.ammo += n; roam.reserve -= n
+            }
+        }
         roam.bestCombo = max(roam.bestCombo, bestCombo)
+        if me.alive { roam.lastDistrict = OWWorld.districtAt(me.pos) }
         let mePos = me.pos
         for p in players where !p.isPlayer {
             if p.stun > 0 { p.stun -= dt }
@@ -3447,6 +3513,8 @@ extension TacticalEngine {
 
     func brawl(_ p: TPlayer) {
         let isMe = p.isPlayer
+        if isMe && roam.weapon == 2 { roamFire(p); return }
+        let bat = isMe && roam.weapon == 1
         let air = isMe && pz > TMove.minAirZ * 2
         var step = 0
         if isMe {
@@ -3456,10 +3524,10 @@ extension TacticalEngine {
             roam.swingT = 0.28
         }
         let heavy = step == 2 || air
-        p.fireCd = isMe ? (heavy ? 0.5 : 0.26) : 0.85
+        p.fireCd = isMe ? (bat ? (heavy ? 0.62 : 0.4) : (heavy ? 0.5 : 0.26)) : (p.arm == 1 ? 1.0 : 0.85)
         p.flash = 0.06
         p.noiseT = 0.8
-        let reach: CGFloat = isMe ? (heavy ? 72 : 62) : 58
+        let reach: CGFloat = isMe ? (bat ? 84 : (heavy ? 72 : 62)) : (p.arm == 1 ? 76 : 58)
         var best: TPlayer? = nil
         var bd = reach
         for v in players where v.alive && v.team != p.team && v.id != p.id {
@@ -3480,11 +3548,11 @@ extension TacticalEngine {
         guard let v = best else { return }
         var dmg: CGFloat
         if isMe {
-            dmg = [11, 12, 21][step]
-            if air { dmg = 26 }
+            dmg = bat ? [17, 18, 30][step] : [11, 12, 21][step]
+            if air { dmg = bat ? 34 : 26 }
             if dashT > 0 { dmg *= 1.5 }
         } else {
-            dmg = [6, 9, 12][min(2, p.tier)]
+            dmg = [6, 9, 12][min(2, p.tier)] + (p.arm == 1 ? [6, 7, 8][min(2, p.tier)] : 0)
         }
         let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
         let behind = abs(tAngDiff(v.aim, ang)) < 1.1
@@ -3494,7 +3562,7 @@ extension TacticalEngine {
         knifeKill = false
         let kd = max(0.001, tDist(p.pos, v.pos))
         let kn = CGVector(dx: (v.pos.x - p.pos.x) / kd, dy: (v.pos.y - p.pos.y) / kd)
-        let force: CGFloat = heavy ? 360 : 130
+        let force: CGFloat = heavy ? 360 : ((bat || p.arm == 1) ? 220 : 130)
         if v.isPlayer {
             pvel.dx += kn.dx * force; pvel.dy += kn.dy * force
             shake = max(shake, 6)
@@ -3523,6 +3591,7 @@ extension TacticalEngine {
     }
 
     func roamKilled(_ v: TPlayer, killer: TPlayer?) {
+        roamPush(killer: killer, victim: v)
         if v.isPlayer {
             let loss = Int(CGFloat(roam.cash) * 0.15)
             roam.cash -= loss
@@ -3532,14 +3601,18 @@ extension TacticalEngine {
         }
         guard killer?.isPlayer == true else { return }
         var pay = 0
+        let dis = OWWorld.districtAt(v.pos)
         if v.civ {
             roam.civKOs += 1
             pay = Int.random(in: 8...35)
+            roamControl(dis, -1)
         } else {
             roam.crewKOs += 1
+            OWOnline.shared.progress(1)
             pay = [60, 120, 400][min(2, v.tier)]
+            roamControl(dis, [2, 3, 8][min(2, v.tier)])
             if var j = roam.job {
-                if j.kind == .turf { j.got += 1; roam.job = j; if j.got >= j.need { roamComplete(); } }
+                if j.kind == .turf && (j.district < 0 || j.district == dis) { j.got += 1; roam.job = j; if j.got >= j.need { roamComplete(); } }
                 else if j.kind == .boss && v.id == roam.bossID { roamComplete() }
             }
         }
@@ -3558,8 +3631,9 @@ extension TacticalEngine {
         case .drop: return j.stage < j.pts.count ? j.pts[j.stage] : nil
         case .boss: return players.first(where: { $0.id == roam.bossID && $0.alive })?.pos
         case .turf:
-            let c = players.filter { $0.alive && !$0.civ && !$0.isPlayer }
-            return c.min(by: { tDist($0.pos, me.pos) < tDist($1.pos, me.pos) })?.pos
+            let c = players.filter { $0.alive && !$0.civ && !$0.isPlayer && (j.district < 0 || OWWorld.districtAt($0.pos) == j.district) }
+            if let n = c.min(by: { tDist($0.pos, me.pos) < tDist($1.pos, me.pos) }) { return n.pos }
+            return j.district >= 0 ? OWWorld.townPoint(j.district) : nil
         }
     }
 
@@ -3568,7 +3642,9 @@ extension TacticalEngine {
         switch j.kind {
         case .drop: return j.stage == 0 ? "Pick up the package" : "Deliver it before time runs out"
         case .boss: return players.first(where: { $0.id == roam.bossID })?.alive == true ? "Find RAZOR and put him down" : "RAZOR is regrouping…"
-        case .turf: return "Knock out crew members  \(j.got) / \(j.need)"
+        case .turf:
+            let where_ = j.district >= 0 ? " in \(OWDistrict.base[j.district].name)" : ""
+            return "Knock out crew members\(where_)  \(j.got) / \(j.need)"
         }
     }
 
@@ -3601,6 +3677,11 @@ extension TacticalEngine {
         guard let j = roam.job else { return }
         roam.cash += j.reward
         roam.jobsDone += 1
+        let jd = j.district >= 0 ? j.district : OWWorld.districtAt(me.pos)
+        if j.capture {
+            let cur = OWWorld.shared.control(jd, base: OWDistrict.base[jd].control)
+            roamControl(jd, max(25, 60 - cur))
+        } else { roamControl(jd, 10) }
         roam.job = nil
         roam.offers = roamOffers()
         banner = "JOB COMPLETE  +$\(j.reward)"
@@ -3627,5 +3708,99 @@ extension TacticalEngine {
         }
         roam.job = j
         if j.timeLeft <= 0 { roamFail("OUT OF TIME") }
+    }
+}
+
+// MARK: - Free Roam weapons: crew bats and pistols, the player's slots, kill feed
+
+extension TacticalEngine {
+    static let armNames = ["FISTS", "BAT", "PISTOL"]
+
+    /// crew gear: regulars carry fists or bats (some a pistol), bruisers lean on pistols, the boss always has one
+    func roamArm(_ p: TPlayer) {
+        guard !p.civ, !p.isPlayer else { return }
+        let r = Int.random(in: 0..<100)
+        switch p.tier {
+        case 2: p.arm = 2
+        case 1: p.arm = r < 55 ? 2 : 1
+        default: p.arm = r < 12 ? 2 : (r < 58 ? 1 : 0)
+        }
+        p.mag = 99
+    }
+
+    /// a crew pistol shot: hitscan with a distance falloff on the hit chance
+    func crewShoot(_ p: TPlayer, _ t: TPlayer) {
+        p.fireCd = p.tier == 2 ? 0.7 : 1.15
+        p.flash = 0.09
+        p.noiseT = 1.5
+        guard TMap.los(p.pos, t.pos) else { return }
+        let d = tDist(p.pos, t.pos)
+        let chance = max(0.12, 0.62 - d / 800)
+        if CGFloat.random(in: 0...1) < chance {
+            damage(t, [7, 9, 13][min(2, p.tier)], by: p.id)
+            if t.isPlayer { shake = max(shake, 4) }
+        }
+    }
+
+    /// the player's pistol: hitscan along the aim, short cooldown, 12 round mag
+    func roamFire(_ p: TPlayer) {
+        guard roam.reloadT <= 0 else { return }
+        if roam.ammo <= 0 { roamReload(); return }
+        p.fireCd = 0.3
+        p.flash = 0.09
+        p.noiseT = 1.5
+        noiseR = 720
+        roam.ammo -= 1
+        shake = max(shake, 2.5)
+        var best: TPlayer? = nil
+        var bd: CGFloat = 460
+        for v in players where v.alive && v.team != p.team && v.id != p.id {
+            let d = tDist(p.pos, v.pos)
+            guard d < bd else { continue }
+            let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
+            guard abs(tAngDiff(ang, p.aim)) < 0.07 + 16 / max(d, 30), TMap.los(p.pos, v.pos), abs(v.z - p.z) < 56 else { continue }
+            bd = d
+            best = v
+        }
+        if let v = best {
+            knifeKill = true
+            damage(v, v.civ ? 24 : 15, by: p.id)
+            knifeKill = false
+            let kd = max(0.001, tDist(p.pos, v.pos))
+            if !v.isPlayer {
+                v.knock = CGVector(dx: (v.pos.x - p.pos.x) / kd * 90, dy: (v.pos.y - p.pos.y) / kd * 90)
+                v.stun = max(v.stun, 0.2)
+            }
+        }
+        if roam.ammo == 0 { roamReload() }
+    }
+
+    func roamReload() {
+        guard roam.weapon == 2, roam.reloadT <= 0, roam.reserve > 0, roam.ammo < RoamState.magSize else { return }
+        roam.reloadT = 1.2
+    }
+
+    func roamSelect(_ w: Int) {
+        guard roam.owned.contains(w), w != roam.weapon else { return }
+        roam.weapon = w
+        roam.reloadT = 0
+        me.arm = w
+        me.fireCd = max(me.fireCd, 0.15)
+    }
+
+    /// buy a weapon (owned for good) or ammo; returns false when you cannot pay
+    func roamBuy(weapon w: Int, price: Int) -> Bool {
+        guard !roam.owned.contains(w), roam.cash >= price else { return false }
+        roam.owned.insert(w)
+        RoamState.saveOwned(roam.owned)
+        return true
+    }
+
+    func roamPush(killer: TPlayer?, victim v: TPlayer) {
+        let mine = killer?.isPlayer == true || v.isPlayer
+        let w = killer?.isPlayer == true ? roam.weapon : (killer?.arm ?? 0)
+        let kn = killer == nil ? "STREET" : (killer!.isPlayer ? "YOU" : killer!.name.uppercased())
+        roam.feed.append(RoamFeedItem(killer: kn, victim: v.isPlayer ? "YOU" : v.name.uppercased(), weapon: w, life: 5, mine: mine, boss: v.tier == 2))
+        if roam.feed.count > 4 { roam.feed.removeFirst() }
     }
 }

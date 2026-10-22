@@ -18,6 +18,9 @@ struct RoamJob: Identifiable, Equatable {
     var stage = 0
     var pts: [CGPoint] = []
     var timeLeft: CGFloat = 0
+    /// map district this job belongs to (-1 = anywhere) and whether finishing it captures the district
+    var district = -1
+    var capture = false
 }
 
 struct RoamState {
@@ -38,6 +41,32 @@ struct RoamState {
     var hideout = CGPoint.zero
     var bossID = -1
     var started: CGFloat = 0
+    var startDistrict = -1
+    var startPos: CGPoint? = nil
+    var lastDistrict = -1
+    /// weapons: 0 fists, 1 bat, 2 pistol; owned slots persist between sessions
+    var weapon = 0
+    var owned: Set<Int> = [0]
+    static let magSize = 12
+    var ammo = 12
+    var reserve = 36
+    var reloadT: CGFloat = 0
+    var feed: [RoamFeedItem] = []
+
+    static func loadOwned() -> Set<Int> {
+        Set((UserDefaults.standard.array(forKey: "ab.roam.owned") as? [Int]) ?? []).union([0])
+    }
+    static func saveOwned(_ s: Set<Int>) { UserDefaults.standard.set(Array(s), forKey: "ab.roam.owned") }
+}
+
+struct RoamFeedItem: Identifiable {
+    let id = UUID()
+    var killer: String
+    var victim: String
+    var weapon: Int
+    var life: CGFloat
+    var mine: Bool
+    var boss: Bool
 }
 
 enum RoamCrew {
@@ -75,6 +104,15 @@ struct RoamHUD: View {
                 Text("\(e.roam.cash)").font(.jk(12, .semibold)).foregroundColor(.white).monospacedDigit()
             }
             .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.45))).overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            if e.roam.lastDistrict >= 0 {
+                let d = OWDistrict.all[e.roam.lastDistrict]
+                HStack(spacing: 5) {
+                    Image(systemName: "mappin.circle.fill").font(.system(size: 10, weight: .bold)).foregroundColor(d.color)
+                    Text(d.name).font(.jk(9, .heavy)).foregroundColor(.white).lineLimit(1)
+                    Text("\(d.control)%").font(.jk(9, .heavy)).foregroundColor(d.color).monospacedDigit()
+                }
+                .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.45))).overlay(Capsule().stroke(d.color.opacity(0.6), lineWidth: 1))
+            }
             HStack(spacing: 6) {
                 Text("K.O.").font(.jk(7, .heavy)).foregroundColor(.black.opacity(0.75)).frame(width: 17, height: 17).background(Circle().fill(Color(red: 0.4, green: 0.7, blue: 1)))
                 Text("\(e.roam.crewKOs + e.roam.civKOs)").font(.jk(12, .semibold)).foregroundColor(.white).monospacedDigit()
@@ -188,6 +226,17 @@ struct RoamHUD: View {
             jobsButton
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 18).padding(.top, 150)
+            RoamMinimap(e: e)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.trailing, 64).padding(.top, 8)
+                .allowsHitTesting(false)
+            RoamFeedView(e: e)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.trailing, 64).padding(.top, 122)
+                .allowsHitTesting(false)
+            RoamWeaponBar(e: e)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 14).padding(.top, 70)
             if phoneOpen {
                 RoamPhone(e: e, close: { phoneOpen = false }, openJobs: { phoneOpen = false; e.roam.jobsOpen = true })
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing).padding(.trailing, 20)

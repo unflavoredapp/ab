@@ -64,6 +64,9 @@ final class TacScene {
     var bodies: [MXNode] = []
     var heads: [MXNode] = []
     var guns: [MXNode] = []
+    var bats: [MXNode] = []
+    var pistols: [MXNode] = []
+    var pflashes: [MXNode] = []
     var flashes: [MXNode] = []
     var headKey: [String] = []
     var shirts: [MXMaterial] = []
@@ -1143,6 +1146,23 @@ final class TacScene {
             blob.castsShadow = false
             rt.addChildNode(blob)
             rt.addChildNode(body)
+            // Free Roam hand props: a bat and a pistol, shown by the weapon in hand
+            let batM = MXMaterial(); batM.diffuse.contents = UIColor(red: 0.55, green: 0.36, blue: 0.18, alpha: 1)
+            let bat = MXNode(geometry: MXCylinder(radius: 1.3, height: 25))
+            bat.geometry?.firstMaterial = batM
+            bat.position = MXVector3(9, 16, 6); bat.eulerAngles = MXVector3(0, 0, -0.6)
+            bat.isHidden = true; bat.castsShadow = false
+            rt.addChildNode(bat); bats.append(bat)
+            let pisM = MXMaterial(); pisM.diffuse.contents = UIColor(white: 0.12, alpha: 1)
+            let pis = MXNode(geometry: MXBox(width: 9, height: 4.5, length: 2.4, chamferRadius: 0.4))
+            pis.geometry?.firstMaterial = pisM
+            pis.position = MXVector3(12, 17, 6); pis.isHidden = true; pis.castsShadow = false
+            let pfM = MXMaterial(); pfM.lightingModel = .constant; pfM.diffuse.contents = UIColor(red: 1, green: 0.85, blue: 0.4, alpha: 1)
+            let pf = MXNode(geometry: MXBox(width: 6, height: 3, length: 3, chamferRadius: 0))
+            pf.geometry?.firstMaterial = pfM
+            pf.position = MXVector3(7, 0, 0); pf.isHidden = true; pf.castsShadow = false
+            pis.addChildNode(pf)
+            rt.addChildNode(pis); pistols.append(pis); pflashes.append(pf)
             root.addChildNode(rt)
             roots.append(rt); bodies.append(body); heads.append(head); guns.append(gun); flashes.append(fl)
             headKey.append("")
@@ -1619,6 +1639,14 @@ final class TacScene {
                 deadK[i] = 0
                 heads[i].isHidden = true
                 guns[i].isHidden = e.gameMode == 10
+                let armv = e.gameMode == 10 ? p.arm : 0
+                bats[i].isHidden = armv != 1
+                pistols[i].isHidden = armv != 2
+                pflashes[i].isHidden = !(p.flash > 0)
+                if armv == 1 {
+                    let sw: Float = p.isPlayer ? Float(e.roam.swingT / 0.28) : (p.flash > 0 ? 1 : 0)
+                    bats[i].eulerAngles = MXVector3(0, 0, -0.6 - 1.3 * min(1, sw))
+                }
                 flashes[i].isHidden = e.gameMode == 10 || !(p.flash > 0)
                 shirts[i].emission.contents = p.hurt > 0 ? UIColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1) : UIColor.black
                 let dpx = p.pos.x - lastPos[i].x, dpy = p.pos.y - lastPos[i].y

@@ -4,6 +4,8 @@ import SwiftUI
 // Prices are placeholders; checkout isn't connected to any payment or currency yet.
 
 struct OWShopView: View {
+    @EnvironmentObject var game: Game
+    @ObservedObject private var online = OWOnline.shared
     let t: TacData
     let size: CGSize
     let act: (LobbyAct) -> Void
@@ -31,7 +33,9 @@ struct OWShopView: View {
                                             ("bag.fill", "GEAR"), ("cross.case.fill", "CONSUMABLES"), ("dollarsign.circle.fill", "CURRENCY"), ("shippingbox.fill", "BUNDLES"), ("theatermasks.fill", "COSMETICS")]
 
     private var total: Double { cart.reduce(0) { $0 + products[$1].price } }
-    private func money(_ d: Double) -> String { String(format: "$ %.2f", d) }
+    private func money(_ d: Double) -> String { "\(coins(d)) ◎" }
+    /// shelf prices are in dollars on the mockup; in the game they cost coins (1 dollar = 100 coins)
+    private func coins(_ d: Double) -> Int { Int((d * 100).rounded()) }
 
     private var sidebar: some View {
         VStack(spacing: 1 * u) {
@@ -165,7 +169,18 @@ struct OWShopView: View {
                 Spacer()
                 Text(money(total)).font(.jk(11 * u, .heavy)).foregroundColor(.white)
             }
-            OWButton(u: u, icon: "cart.fill", title: "CHECKOUT") { note = cart.isEmpty ? "Your cart is empty" : "Checkout isn't connected yet" }
+            OWButton(u: u, icon: "cart.fill", title: "CHECKOUT") {
+                guard !cart.isEmpty else { note = "Your cart is empty"; return }
+                let cost = cart.reduce(0) { $0 + coins(products[$1].price) }
+                guard game.s.ex.gems >= cost else { note = "Not enough coins (\(cost) needed)"; return }
+                let names = cart.map { products[$0].name }
+                Task {
+                    if await online.checkout(items: names, cost: cost) {
+                        var st = game.s; st.ex.gems -= cost; game.s = st
+                        cart.removeAll(); note = "PURCHASED · -\(cost) coins"
+                    } else { note = "Purchase refused by the server" }
+                }
+            }
         }
         .padding(8 * u).frame(width: 182 * u).owPanel(u)
     }
@@ -187,8 +202,8 @@ struct OWShopView: View {
             HStack {
                 Text("CAR SKIN + OUTFIT + CASH").font(.jk(6.5 * u, .medium)).foregroundColor(.white.opacity(0.75))
                 Spacer()
-                Text("$ 7.49").font(.jk(10 * u, .heavy)).foregroundColor(OW.green)
-                Text("$ 14.99").font(.jk(7 * u, .medium)).strikethrough().foregroundColor(.white.opacity(0.5))
+                Text("749 ◎").font(.jk(10 * u, .heavy)).foregroundColor(OW.green)
+                Text("1499 ◎").font(.jk(7 * u, .medium)).strikethrough().foregroundColor(.white.opacity(0.5))
             }
             Text("DAILY DEAL").font(.jk(8.5 * u, .heavy)).foregroundColor(.white).padding(.top, 2 * u)
             HStack(spacing: 6 * u) {
@@ -198,7 +213,7 @@ struct OWShopView: View {
                     Text("1,500").font(.jk(8.5 * u, .heavy)).foregroundColor(OW.gold)
                 }
                 Spacer()
-                Button { note = "Daily deal bought with coins is coming" } label: { Text("BUY").font(.jk(8 * u, .heavy)).foregroundColor(.black).padding(.horizontal, 10 * u).frame(height: 18 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }.buttonStyle(.plain)
+                Button { if game.s.ex.gems >= 1500 { var st = game.s; st.ex.gems -= 1500; game.s = st; note = "Supply crate bought" } else { note = "Not enough coins" } } label: { Text("BUY").font(.jk(8 * u, .heavy)).foregroundColor(.black).padding(.horizontal, 10 * u).frame(height: 18 * u).background(RoundedRectangle(cornerRadius: 2 * u).fill(OW.cyan)) }.buttonStyle(.plain)
             }
         }
         .padding(8 * u).frame(width: 182 * u).owPanel(u)
@@ -206,7 +221,7 @@ struct OWShopView: View {
 
     private var footer: some View {
         HStack(spacing: 18 * u) {
-            ForEach(Array([("lock.shield.fill", "Secure Payments"), ("bolt.fill", "Instant Delivery"), ("crown.fill", "Trusted by Thousands")].enumerated()), id: \.offset) { _, e in
+            ForEach(Array([("lock.shield.fill", "Pay with coins"), ("bolt.fill", "Instant Delivery"), ("crown.fill", "Trusted by Thousands")].enumerated()), id: \.offset) { _, e in
                 HStack(spacing: 5 * u) {
                     Image(systemName: e.0).font(.system(size: 10 * u)).foregroundColor(.white.opacity(0.8))
                     Text(e.1).font(.jk(8 * u, .medium)).foregroundColor(.white.opacity(0.8))
@@ -214,8 +229,9 @@ struct OWShopView: View {
             }
             Spacer()
             if !note.isEmpty { Text(note).font(.jk(8.5 * u, .heavy)).foregroundColor(OW.gold) }
-            Text("YOUR BALANCE").font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.7))
-            Text("$ \(t.rating)").font(.jk(9 * u, .heavy)).foregroundColor(OW.gold)
+            Text(online.status).font(.jk(7 * u, .heavy)).foregroundColor(online.connected ? OW.green : .white.opacity(0.5))
+            Text("YOUR COINS").font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.7))
+            Text("\(game.s.ex.gems) ◎").font(.jk(9 * u, .heavy)).foregroundColor(OW.gold)
         }
         .padding(.horizontal, 14 * u).frame(height: 26 * u).owPanel(u)
     }
@@ -233,5 +249,6 @@ struct OWShopView: View {
             .padding(.horizontal, 12 * u).padding(.top, 8 * u).padding(.bottom, 8 * u)
         }
         .frame(width: size.width, height: size.height)
+        .onAppear { online.connect() }
     }
 }

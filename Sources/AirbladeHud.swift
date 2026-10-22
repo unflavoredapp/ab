@@ -168,10 +168,12 @@ struct AirbladeHud: View {
                     .padding(.leading, 18).padding(.top, 62)
                     .allowsHitTesting(false)
             }
+            if e.gameMode != 10 {
             feed(me)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 10).padding(.trailing, 64)
-                .allowsHitTesting(false)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 10).padding(.trailing, 64)
+                    .allowsHitTesting(false)
+            }
             if me.alive {
                 Circle().stroke(Color.white.opacity(0.75), lineWidth: 1).frame(width: 9, height: 9)
                     .shadow(color: .black.opacity(0.7), radius: 1.5)

@@ -188,13 +188,21 @@ struct RoamPhone: View {
                 guard e.me.alive, e.me.armor < 100 else { say("Armor is full"); return false }
                 e.me.armor = 100; e.me.armorKind = 1; return true
             }
+            if !e.roam.owned.contains(1) {
+                buy("Baseball bat", 250) { if e.roamBuy(weapon: 1, price: 250) { say("Bat added to your slots"); return true }; return false }
+            }
+            if !e.roam.owned.contains(2) {
+                buy("Pistol + 36 rounds", 900) { if e.roamBuy(weapon: 2, price: 900) { say("Pistol added to your slots"); return true }; return false }
+            } else {
+                buy("Ammo  +24", 120) { e.roam.reserve += 24; return true }
+            }
             Text(toast).font(.jk(7.5, .semibold)).foregroundColor(gold)
             Spacer(minLength: 0)
         }
     }
 
     private var eventsApp: some View {
-        let n = e.roam.crewKOs
+        let n = max(e.roam.crewKOs, OWOnline.shared.takedowns)
         return VStack(spacing: 4) {
             header("Events")
             VStack(alignment: .leading, spacing: 3) {

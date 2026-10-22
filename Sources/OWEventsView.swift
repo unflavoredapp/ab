@@ -11,6 +11,8 @@ struct OWEventsView: View {
 
     @State private var side = 0
     @State private var joined = false
+    @ObservedObject private var online = OWOnline.shared
+    @State private var note = ""
 
     private var u: CGFloat { min(size.width / 1024, size.height / 470) }
 
@@ -67,13 +69,20 @@ struct OWEventsView: View {
                 Text("TAKEDOWN").font(.jk(30 * u, .heavy)).italic().foregroundColor(OW.red).offset(y: -6 * u)
                 Text("Take down rival crews, hold the zones, earn exclusive rewards.").font(.jk(8 * u, .medium)).foregroundColor(.white.opacity(0.9)).frame(width: 230 * u, alignment: .leading)
                 HStack(spacing: 8 * u) {
-                    goal("person.crop.circle.badge.xmark", "Eliminate Rival Members", "0/50")
+                    goal("person.crop.circle.badge.xmark", "Eliminate Rival Members", "\(min(OWOnline.eventGoal, online.takedowns))/\(OWOnline.eventGoal)")
                     goal("crown.fill", "Hold Territory", "0/3")
-                    goal("star.fill", "Earn Event Points", "0/10,000")
+                    goal("star.fill", "Earn Event Points", "\(online.takedowns * 65)/\(OWOnline.eventGoal * 65)")
                 }
-                Button { joined = true; act(.launch(10)) } label: {
+                Button {
+                    if online.takedowns >= OWOnline.eventGoal && !online.claimed {
+                        Task {
+                            let c = await online.claim()
+                            if c > 0 { var st = game.s; st.ex.gems += c; game.s = st; note = "+\(c) COINS CLAIMED" } else { note = "Could not claim" }
+                        }
+                    } else { joined = true; act(.launch(10)) }
+                } label: {
                     HStack(spacing: 6 * u) {
-                        Text(joined ? "ENTER EVENT" : "JOIN EVENT").font(.jk(10.5 * u, .heavy))
+                        Text(online.claimed ? "REWARD CLAIMED" : (online.takedowns >= OWOnline.eventGoal ? "CLAIM REWARD" : (joined ? "ENTER EVENT" : "JOIN EVENT"))).font(.jk(10.5 * u, .heavy))
                         Image(systemName: "chevron.right").font(.system(size: 9 * u, weight: .bold))
                     }
                     .foregroundColor(.black).padding(.horizontal, 16 * u).frame(height: 26 * u).background(RoundedRectangle(cornerRadius: 3 * u).fill(OW.cyan))
@@ -131,9 +140,10 @@ struct OWEventsView: View {
             Text("Rival crews are moving in. Work with your crew to take control of their territories, eliminate their members, and claim the rewards.")
                 .font(.jk(7.5 * u, .medium)).foregroundColor(.white.opacity(0.85))
             row("timer", "Event Duration", "2d 14h 32m")
-            row("chart.bar.fill", "Your Progress", "3,240 pts")
-            ZStack(alignment: .leading) { Capsule().fill(Color.white.opacity(0.12)); Capsule().fill(OW.cyan).frame(width: 168 * 0.32 * u) }.frame(height: 3.5 * u)
-            row("crown.fill", "Rank", "#4")
+            row("chart.bar.fill", "Your Progress", "\(online.takedowns * 65) pts")
+            ZStack(alignment: .leading) { Capsule().fill(Color.white.opacity(0.12)); Capsule().fill(OW.cyan).frame(width: 168 * u * CGFloat(min(OWOnline.eventGoal, online.takedowns)) / CGFloat(OWOnline.eventGoal)) }.frame(height: 3.5 * u)
+            row("crown.fill", "Rank", online.connected ? "ONLINE" : "LOCAL")
+            if !note.isEmpty { Text(note).font(.jk(8 * u, .heavy)).foregroundColor(OW.gold) }
             Text("REWARDS").font(.jk(9 * u, .heavy)).foregroundColor(OW.cyan).padding(.top, 2 * u)
             HStack(spacing: 4 * u) {
                 ForEach(Array(["person.fill", "scope", "shield.lefthalf.filled", "banknote.fill"].enumerated()), id: \.offset) { i, s in
@@ -208,5 +218,6 @@ struct OWEventsView: View {
             .padding(.horizontal, 12 * u).padding(.top, 8 * u).padding(.bottom, 8 * u)
         }
         .frame(width: size.width, height: size.height)
+        .onAppear { online.connect() }
     }
 }

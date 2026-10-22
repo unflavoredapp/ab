@@ -19,6 +19,13 @@
 		<string>PlusJakartaSans_700Bold.ttf</string>
 		<string>PlusJakartaSans_800ExtraBold.ttf</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connects to your crew server for online crew, events and the shared map.</string>
 	<key>UIRequiresFullScreen</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>

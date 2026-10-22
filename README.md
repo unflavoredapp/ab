@@ -2,7 +2,7 @@
 
 iPhone-only, landscape, third-person sword-and-gun action game in the spirit of GunZ: The Duel. SwiftUI front end over a custom Metal engine ("MX"). Offline vs bots for now. Built unsigned via XcodeGen + GitHub Actions.
 
-The old bodycam look is gone: no REC stamp, film grain, lens shader or first-person view. The camera is always the third-person chase camera. Only the bundle id (`city.battlecam.game`) still carries the old name, so existing signing keeps working.
+The old bodycam look is gone: no REC stamp, film grain, lens shader or first-person view. The camera is always the third-person chase camera. The app is HoodBlok, bundle id `com.hoodblok.game`.
 
 Controls in match: left stick moves, right side looks, FIRE shoots, slash (diagonal-line button) swings the blade, bolt button dashes, arrow jumps.
 
@@ -16,7 +16,7 @@ On failure the run summary lists the compiler errors. The full log is in the `bu
 
 ## Layout
 
-- `project.yml`: XcodeGen spec (bundle `city.battlecam.game`, iOS 16+, iPhone)
+- `project.yml`: XcodeGen spec (bundle `com.hoodblok.game`, iOS 16+, iPhone)
 - `.github/workflows/build.yml`: CI. Builds an unsigned IPA only; it never edits the repo, so new `.swift` files need no registration.
 - `Sources/`: game and engine
   - `MX*.swift`: Metal engine (loader, renderer, shaders, materials)

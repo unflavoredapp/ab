@@ -53,6 +53,8 @@ struct LobbyHome: View {
     private let blue = Color(red: 0.25, green: 0.65, blue: 1.0)
     private let discord = Color(red: 0.345, green: 0.396, blue: 0.949)
 
+    private let glass = Color(red: 0.04, green: 0.06, blue: 0.11).opacity(0.78)
+    private let edge = Color(red: 0.55, green: 0.7, blue: 1).opacity(0.22)
     private var W: CGFloat { size.width }
     private var H: CGFloat { size.height }
     private var u: CGFloat { min(size.width / 1024, size.height / 470) }
@@ -60,26 +62,35 @@ struct LobbyHome: View {
     // MARK: top bar
 
     private func currency(_ letter: String, _ value: String, _ ring: Color) -> some View {
-        HStack(spacing: 5 * u) {
-            Text(letter).font(.jk(7 * u, .heavy)).foregroundColor(ring)
-                .frame(width: 15 * u, height: 15 * u)
-                .overlay(Circle().stroke(ring, lineWidth: 1.2))
-            Text(value).font(.jk(10 * u, .semibold)).foregroundColor(.white.opacity(0.9)).monospacedDigit().fixedSize()
+        HStack(spacing: 6 * u) {
+            Text(letter).font(.jk(7 * u, .heavy)).foregroundColor(.black.opacity(0.75))
+                .frame(width: 16 * u, height: 16 * u)
+                .background(Circle().fill(ring))
+            Text(value).font(.jk(10.5 * u, .semibold)).foregroundColor(.white).monospacedDigit().fixedSize()
         }
+        .padding(.horizontal, 9 * u).frame(height: 24 * u)
+        .background(Capsule().fill(glass))
+        .overlay(Capsule().stroke(edge, lineWidth: 1))
     }
 
     private func topNav(_ title: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).font(.jk(13 * u, .semibold)).foregroundColor(selected ? .white : .white.opacity(0.5))
-                .padding(.horizontal, 20 * u).frame(height: 40 * u)
-                .background(selected ? Color.white.opacity(0.09) : Color.clear)
+            Text(title).font(.jk(13 * u, selected ? .heavy : .semibold)).foregroundColor(selected ? .white : .white.opacity(0.62))
+                .padding(.horizontal, 18 * u).frame(height: 40 * u)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(selected ? blue : .clear).frame(height: 2 * u).padding(.horizontal, 10 * u)
+                        .shadow(color: blue.opacity(0.8), radius: 4 * u)
+                }
         }.buttonStyle(.plain)
     }
 
     private func subNav(_ title: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).font(.jk(10.5 * u, selected ? .heavy : .semibold)).foregroundColor(selected ? .white : .white.opacity(0.42))
-                .padding(.horizontal, 12 * u).frame(height: 22 * u)
+            Text(title).font(.jk(10.5 * u, selected ? .heavy : .semibold)).foregroundColor(selected ? .white : .white.opacity(0.5))
+                .padding(.horizontal, 14 * u).frame(height: 24 * u)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(selected ? blue : .clear).frame(height: 1.5 * u).padding(.horizontal, 6 * u)
+                }
         }.buttonStyle(.plain)
     }
 
@@ -97,35 +108,34 @@ struct LobbyHome: View {
         let xp = TacRank.totalXP(t)
         let ri = TacRank.index(xp)
         return Button { act(.ranks) } label: {
-            HStack(spacing: 7 * u) {
-                BladeEmblem().frame(width: 22 * u, height: 25 * u).padding(3 * u)
-                    .background(Color(red: 0.25, green: 0.05, blue: 0.07)).overlay(Rectangle().stroke(Color.white.opacity(0.25), lineWidth: 1))
-                VStack(alignment: .leading, spacing: 2 * u) {
+            HStack(spacing: 8 * u) {
+                BladeEmblem().frame(width: 22 * u, height: 25 * u).padding(4 * u)
+                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.22, green: 0.04, blue: 0.06)))
+                VStack(alignment: .leading, spacing: 3 * u) {
+                    Text(TacProfile.name.uppercased()).font(.jk(10.5 * u, .heavy)).italic().foregroundColor(.white).lineLimit(1)
                     HStack(spacing: 6 * u) {
-                        Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.75)).fixedSize()
-                        Text(TacProfile.name.uppercased()).font(.jk(9.5 * u, .heavy)).foregroundColor(.white).lineLimit(1)
+                        Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
+                        Spacer(minLength: 0)
+                        Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
                     }
-                    HStack(spacing: 4 * u) {
-                        Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(7.5 * u, .semibold)).foregroundColor(.white.opacity(0.6)).fixedSize()
-                        ZStack(alignment: .leading) {
-                            Rectangle().fill(Color.white.opacity(0.15))
-                            Rectangle().fill(blue).frame(width: 60 * u * CGFloat(TacRank.progress(xp)))
-                        }
-                        .frame(width: 60 * u, height: 3 * u)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.14))
+                        Capsule().fill(blue).frame(width: 100 * u * CGFloat(TacRank.progress(xp)))
                     }
+                    .frame(width: 100 * u, height: 3.5 * u)
                 }
                 .frame(width: 100 * u, alignment: .leading)
             }
-            .padding(.horizontal, 6 * u).frame(height: 34 * u)
-            .background(Color.black.opacity(0.35))
-            .overlay(Rectangle().stroke(Color.white.opacity(0.18), lineWidth: 1))
+            .padding(.horizontal, 8 * u).frame(height: 38 * u)
+            .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
         }.buttonStyle(.plain)
     }
 
     private var topBar: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                AirbladeLogo(size: 15 * u).padding(.leading, 26 * u).padding(.trailing, 14 * u)
+                AirbladeLogo(size: 18 * u).padding(.leading, 26 * u).padding(.trailing, 18 * u)
                 topNav("HideOut", selected: true) { act(.nav(0)) }
                 topNav("Play") { act(.screen(1)) }
                 topNav("Shop") { act(.nav(6)) }
@@ -144,9 +154,9 @@ struct LobbyHome: View {
                 }
                 .padding(.leading, 10 * u).padding(.trailing, 14 * u)
             }
-            .frame(height: 40 * u)
-            .background(LinearGradient(colors: [Color.black.opacity(0.62), Color.black.opacity(0.35)], startPoint: .top, endPoint: .bottom))
-            .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1) }
+            .frame(height: 44 * u)
+            .background(LinearGradient(colors: [Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.85), Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.25)], startPoint: .top, endPoint: .bottom))
+            .overlay(alignment: .bottom) { Rectangle().fill(edge).frame(height: 1) }
             HStack(spacing: 0) {
                 subNav("Lobby", selected: true) { act(.nav(0)) }
                 subNav("Record") { act(.stats) }
@@ -184,57 +194,72 @@ struct LobbyHome: View {
     }
 
     private var websiteCard: some View {
-        VStack(spacing: 4 * u) {
-            AirbladeLogo(size: 16 * u)
-            HStack(spacing: 4 * u) {
-                Text("AIRBLADE Official Website").font(.jk(10 * u, .heavy)).italic().foregroundColor(.white).fixedSize()
-                Image(systemName: "arrow.up.right.square").font(.system(size: 8 * u, weight: .bold)).foregroundColor(.white.opacity(0.85))
+        VStack(spacing: 6 * u) {
+            AirbladeLogo(size: 20 * u)
+            HStack(spacing: 5 * u) {
+                Text("Official Website").font(.jk(10.5 * u, .semibold)).foregroundColor(.white.opacity(0.92)).fixedSize()
+                Image(systemName: "arrow.up.right.square").font(.system(size: 9 * u, weight: .semibold)).foregroundColor(.white.opacity(0.85))
             }
-            pageDots(0, 2)
         }
-        .frame(width: 198 * u, height: 70 * u)
-        .background(LinearGradient(colors: [Color(white: 0.33).opacity(0.75), Color(white: 0.16).opacity(0.75)], startPoint: .top, endPoint: .bottom))
-        .overlay(Rectangle().stroke(Color.white.opacity(0.14), lineWidth: 1))
+        .frame(width: 210 * u, height: 84 * u)
+        .background(glass)
     }
 
     private var discordCard: some View {
         Button { } label: {
-            VStack(spacing: 8 * u) {
+            VStack(spacing: 7 * u) {
                 Image(systemName: "gamecontroller.fill").font(.system(size: 22 * u, weight: .bold))
                 Text("JOIN OFFICIAL DISCORD").font(.jk(15 * u, .heavy)).italic().fixedSize()
             }
-            .foregroundColor(.white).frame(width: 198 * u, height: 104 * u)
+            .foregroundColor(.white).frame(width: 210 * u, height: 96 * u)
             .background(discord)
         }.buttonStyle(.plain)
+    }
+
+    /// website + discord as one rounded panel, like the mockup
+    private var newsPanel: some View {
+        VStack(spacing: 0) {
+            websiteCard
+            discordCard
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6 * u))
+        .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
+        .shadow(color: .black.opacity(0.45), radius: 10 * u, y: 4 * u)
     }
 
     private var clanCard: some View {
         let ri = TacRank.index(TacRank.totalXP(t))
         return Button { act(.ranks) } label: {
-            HStack(spacing: 10 * u) {
-                BladeEmblem().frame(width: 36 * u, height: 40 * u)
-                    .frame(width: 52 * u, height: 52 * u)
-                    .background(Color(red: 0.2, green: 0.05, blue: 0.06))
+            HStack(spacing: 12 * u) {
+                BladeEmblem().frame(width: 30 * u, height: 34 * u)
+                    .frame(width: 44 * u, height: 44 * u)
+                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.2, green: 0.04, blue: 0.06)))
                 VStack(alignment: .leading, spacing: 3 * u) {
-                    Text(TacProfile.name).font(.jk(10.5 * u, .heavy)).foregroundColor(.white).lineLimit(1)
-                    Text("Rank : \(TacRank.ranks[ri].name)").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.75)).lineLimit(1)
-                    Text("\(t.wins)W \(t.losses)L  ·  \(t.kills) K").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.75)).lineLimit(1)
-                    pageDots(0, 2).padding(.top, 1 * u)
+                    Text(TacProfile.name).font(.jk(11 * u, .heavy)).foregroundColor(.white).lineLimit(1)
+                    Text("Rank: \(TacRank.ranks[ri].name)").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.72)).lineLimit(1)
+                    Text("\(t.wins)W \(t.losses)L  ·  \(t.kills) K").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.72)).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(5 * u).frame(width: 198 * u, height: 62 * u)
-            .background(Color(red: 0.06, green: 0.07, blue: 0.08).opacity(0.82))
-            .overlay(Rectangle().stroke(Color.white.opacity(0.14), lineWidth: 1))
+            .padding(.horizontal, 10 * u).frame(width: 210 * u, height: 62 * u)
+            .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
         }.buttonStyle(.plain)
     }
 
     private var quickStart: some View {
         Button { act(.screen(2)) } label: {
-            Text("QUICK START").font(.jk(12.5 * u, .heavy)).foregroundColor(.white)
-                .frame(width: 198 * u, height: 32 * u)
-                .background(LinearGradient(colors: [Color(red: 0.2, green: 0.45, blue: 0.62), Color(red: 0.12, green: 0.3, blue: 0.45)], startPoint: .top, endPoint: .bottom))
-                .overlay(Rectangle().stroke(Color.white.opacity(0.35), lineWidth: 1))
+            HStack(spacing: 0) {
+                Spacer()
+                Text("QUICK START").font(.jk(15 * u, .heavy)).italic().foregroundColor(.white)
+                Spacer()
+                Image(systemName: "chevron.forward.2").font(.system(size: 14 * u, weight: .black)).foregroundColor(Color(red: 0.45, green: 0.75, blue: 1))
+                    .padding(.trailing, 14 * u)
+            }
+            .frame(width: 210 * u, height: 42 * u)
+            .background(ChamferShape(cut: 10 * u).fill(LinearGradient(colors: [Color(red: 0.07, green: 0.13, blue: 0.24), Color(red: 0.03, green: 0.06, blue: 0.13)], startPoint: .top, endPoint: .bottom)))
+            .overlay(ChamferShape(cut: 10 * u).stroke(Color(red: 0.35, green: 0.62, blue: 1).opacity(0.9), lineWidth: 1.4))
+            .shadow(color: Color(red: 0.2, green: 0.5, blue: 1).opacity(0.55), radius: 8 * u)
         }.buttonStyle(.plain)
     }
 
@@ -243,15 +268,15 @@ struct LobbyHome: View {
     private func slot(_ k: Int, selected: Bool) -> some View {
         Button { act(.avatar) } label: {
             ZStack {
-                Rectangle().fill(Color.black.opacity(0.55))
+                RoundedRectangle(cornerRadius: 4 * u).fill(selected ? Color(red: 0.55, green: 0.08, blue: 0.08) : glass)
                 if k == 0 {
-                    HeroFace(s: 26 * u)
+                    HeroFace(s: 28 * u).clipShape(RoundedRectangle(cornerRadius: 3 * u))
                 } else {
-                    Image(systemName: "person.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.35))
+                    Image(systemName: "person.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.4))
                 }
             }
-            .frame(width: 28 * u, height: 28 * u)
-            .overlay(Rectangle().stroke(selected ? Color(red: 0.92, green: 0.15, blue: 0.15) : Color.white.opacity(0.28), lineWidth: selected ? 1.6 : 1))
+            .frame(width: 32 * u, height: 32 * u)
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(selected ? Color(red: 1, green: 0.3, blue: 0.3) : edge, lineWidth: selected ? 1.6 : 1))
         }.buttonStyle(TuiPress())
     }
 
@@ -261,9 +286,10 @@ struct LobbyHome: View {
             slot(1, selected: false)
             slot(2, selected: false)
             Button { act(.avatar) } label: {
-                Image(systemName: "plus").font(.system(size: 13 * u, weight: .light)).foregroundColor(.white.opacity(0.55))
-                    .frame(width: 28 * u, height: 28 * u)
-                    .overlay(Rectangle().stroke(Color.white.opacity(0.28), lineWidth: 1))
+                Image(systemName: "plus").font(.system(size: 14 * u, weight: .light)).foregroundColor(.white.opacity(0.6))
+                    .frame(width: 32 * u, height: 32 * u)
+                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+                    .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
             }.buttonStyle(TuiPress())
         }
         .position(x: W * 0.51, y: H - 34 * u)
@@ -324,13 +350,10 @@ struct LobbyHome: View {
         ZStack(alignment: .topLeading) {
             // the hero stands in the 3D hideout behind this page (HideoutBackdrop in Lobby.swift)
 
-            VStack(alignment: .leading, spacing: 5 * u) {
-                websiteCard
-                discordCard
-            }
-            .padding(.leading, 27 * u).padding(.top, 104 * u)
+            newsPanel
+                .padding(.leading, 27 * u).padding(.top, 100 * u)
 
-            VStack(alignment: .leading, spacing: 8 * u) {
+            VStack(alignment: .leading, spacing: 10 * u) {
                 Spacer(minLength: 0)
                 clanCard
                 quickStart

@@ -9,8 +9,8 @@ struct AirbladeLogo: View {
             Text("AIRBLADE")
                 .font(.system(size: size, weight: .black, design: .default).italic())
                 .tracking(size * 0.02)
-                .foregroundStyle(LinearGradient(colors: [.white, Color(red: 0.72, green: 0.82, blue: 0.98), Color(red: 0.36, green: 0.58, blue: 0.95)], startPoint: .top, endPoint: .bottom))
-                .shadow(color: Color(red: 0.2, green: 0.45, blue: 1).opacity(0.6), radius: size * 0.22)
+                .foregroundStyle(LinearGradient(colors: [.white, Color(white: 0.9), Color(white: 0.68)], startPoint: .top, endPoint: .bottom))
+                .shadow(color: Color(red: 1, green: 0.45, blue: 0.15).opacity(0.55), radius: size * 0.18)
                 .lineLimit(1)
                 .fixedSize()
             // slashes through the wordmark
@@ -26,7 +26,7 @@ struct AirbladeLogo: View {
                 p.addQuadCurve(to: CGPoint(x: size * 5.2, y: 0), control: CGPoint(x: size * 2.2, y: size * 0.1))
                 p.addQuadCurve(to: CGPoint(x: 0, y: size * 0.16), control: CGPoint(x: size * 2.4, y: size * 0.28))
             }
-            .fill(LinearGradient(colors: [.clear, Color(red: 0.4, green: 0.65, blue: 1), .white], startPoint: .leading, endPoint: .trailing))
+            .fill(LinearGradient(colors: [.clear, Color(red: 1, green: 0.42, blue: 0.12), Color(red: 1, green: 0.85, blue: 0.6)], startPoint: .leading, endPoint: .trailing))
             .frame(width: size * 5.2, height: size * 0.3)
             .offset(y: size * 0.72)
         }
@@ -67,8 +67,30 @@ struct HideoutBackdrop: View {
     /// the painted room (Resources/hideout_bg.jpg, blender-scripts/hideout_paint.py); the code-drawn room is the fallback
     static let bgImage: UIImage? = Bundle.main.path(forResource: "hideout_bg", ofType: "jpg").flatMap { UIImage(contentsOfFile: $0) }
 
+    /// your hideout art (Resources/hideout_user_bg.jpg): when present it is the background and the 3D hero stands in front of it
+    static let userBg: UIImage? = Bundle.main.path(forResource: "hideout_user_bg", ofType: "jpg").flatMap { UIImage(contentsOfFile: $0) }
+
     var body: some View {
-        if HideoutStage.available {
+        if let bg = Self.userBg {
+            GeometryReader { g in
+                let W = g.size.width, H = g.size.height
+                ZStack {
+                    Image(uiImage: bg).resizable().interpolation(.high).scaledToFill()
+                        .frame(width: W, height: H).clipped()
+                    if hero {
+                        Ellipse()
+                            .fill(RadialGradient(colors: [Color.black.opacity(0.65), .clear], center: .center, startRadius: 2, endRadius: W * 0.1))
+                            .frame(width: W * 0.2, height: H * 0.06)
+                            .position(x: W * 0.53, y: H * 0.93)
+                        AirbladeHero()
+                            .frame(width: W * 0.42, height: H * 0.92)
+                            .position(x: W * 0.53, y: H * 0.52)
+                            .allowsHitTesting(false)
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        } else if HideoutStage.available {
             // the real 3D room, rendered live by the Metal engine
             HideoutStage(hero: hero).ignoresSafeArea()
         } else if let bg = Self.bgImage {

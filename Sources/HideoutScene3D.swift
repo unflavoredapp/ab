@@ -26,14 +26,15 @@ struct HideoutStage: UIViewRepresentable {
     }
 
     private static func mat(_ img: UIImage?, _ color: UIColor = .gray, sx: CGFloat = 1, sy: CGFloat = 1,
-                            bump: CGFloat = 0.45, spec: CGFloat = 0.12, shine: CGFloat = 0.25) -> MXMaterial {
+                            bump: CGFloat = 0.45, spec: CGFloat = 0.05, shine: CGFloat = 0.2) -> MXMaterial {
+        let useBump = false   // bump from the colour texture made every surface sparkle on device
         let m = MXMaterial()
         m.lightingModel = .blinn
         if let i = img {
             m.diffuse.contents = i
             m.diffuse.wrapS = .repeat; m.diffuse.wrapT = .repeat
             m.diffuse.contentsTransform = MXMatrix4MakeScale(Float(sx), Float(sy), 1)
-            if bump > 0 {
+            if useBump && bump > 0 {
                 m.normal.contents = i
                 m.normal.intensity = bump
                 m.normal.wrapS = .repeat; m.normal.wrapT = .repeat
@@ -268,7 +269,7 @@ struct HideoutStage: UIViewRepresentable {
         // steel chest, right foreground
         let chestFront = mat(steelT, bump: 0.35, spec: 0.5, shine: 0.55)
         let chestSide = mat(steelT, sx: 0.6, sy: 1, bump: 0.35, spec: 0.5, shine: 0.55)
-        let chest = box(1.3, 0.78, 0.75, 2.9, 0.39, 1.0, [chestFront, chestSide, chestSide, chestSide, chestSide, chestSide], chamfer: 0.02)
+        let chest = box(1.3, 0.78, 0.75, 2.3, 0.39, 1.3, [chestFront, chestSide, chestSide, chestSide, chestSide, chestSide], chamfer: 0.02)
         chest.eulerAngles = MXVector3(0, -0.5, 0)
         root.addChildNode(chest)
 
@@ -313,20 +314,21 @@ struct HideoutStage: UIViewRepresentable {
         cam.zNear = 0.1
         cam.zFar = 40
         cam.wantsHDR = true
-        cam.bloomIntensity = 0.65
+        cam.bloomIntensity = 0.5
         cam.bloomThreshold = 0.82
         cam.bloomBlurRadius = 7
-        cam.vignettingIntensity = 0.75
+        cam.vignettingIntensity = 0.45
         cam.vignettingPower = 1.3
-        cam.screenSpaceAmbientOcclusionIntensity = 0.9
+        cam.screenSpaceAmbientOcclusionIntensity = 0   // SSAO was noisy on device
         cam.screenSpaceAmbientOcclusionRadius = 0.35
-        cam.saturation = 1.08
-        cam.contrast = 0.16
+        cam.saturation = 1.0
+        cam.contrast = 0.08
+        cam.exposure = 1.3
         camN.camera = cam
-        camN.position = MXVector3(-0.2, 1.15, 5.2)
+        camN.position = MXVector3(-0.15, 1.05, 4.6)
         root.addChildNode(camN)
         v.pointOfView = camN
-        camN.look(at: MXVector3(-0.2, 1.1, 0))
+        camN.look(at: MXVector3(-0.15, 1.0, 0))
 
         // lights: dim warm ambient, a soft key from the front-left that casts the shadows,
         // the desk lamp and wall lamps (warm), cool window light, a faint fill
@@ -338,8 +340,8 @@ struct HideoutStage: UIViewRepresentable {
             root.addChildNode(n)
             return n
         }
-        _ = light(.ambient, Self.C(0.55, 0.5, 0.46), 260, MXVector3(0, 0, 0))
-        let key = light(.directional, Self.C(1, 0.9, 0.78), 520, MXVector3(-2.5, 4.5, 4))
+        _ = light(.ambient, Self.C(0.62, 0.66, 0.78), 520, MXVector3(0, 0, 0))
+        let key = light(.directional, Self.C(0.95, 0.95, 1.0), 650, MXVector3(-2.5, 4.5, 4))
         key.light?.castsShadow = true
         key.light?.shadowMode = .deferred
         key.light?.shadowRadius = 4
@@ -347,11 +349,11 @@ struct HideoutStage: UIViewRepresentable {
         key.light?.shadowColor = UIColor(white: 0, alpha: 0.62)
         key.light?.maximumShadowDistance = 14
         key.look(at: MXVector3(0.3, 0, -1))
-        _ = light(.omni, Self.C(1, 0.74, 0.44), 900, MXVector3(-2.4, 1.22, -2.25), start: 0.2, end: 4.2)      // desk lamp
-        _ = light(.omni, Self.C(1, 0.78, 0.52), 650, MXVector3(1.0, 3.05, -2.4), start: 0.2, end: 5)
-        _ = light(.omni, Self.C(1, 0.78, 0.52), 650, MXVector3(4.2, 3.05, -2.4), start: 0.2, end: 5)
-        _ = light(.omni, Self.C(0.5, 0.6, 0.9), 520, MXVector3(-2.7, 2.2, -2.2), start: 0.5, end: 6.5)       // window
-        _ = light(.omni, Self.C(0.7, 0.72, 0.8), 160, MXVector3(0, 2.2, 4.5), start: 1, end: 9)               // fill
+        _ = light(.omni, Self.C(1, 0.8, 0.55), 1100, MXVector3(-2.4, 1.22, -2.25), start: 0.3, end: 4.5)      // desk lamp
+        _ = light(.omni, Self.C(1, 0.84, 0.62), 750, MXVector3(1.0, 3.05, -2.4), start: 0.3, end: 5.5)
+        _ = light(.omni, Self.C(1, 0.84, 0.62), 750, MXVector3(4.2, 3.05, -2.4), start: 0.3, end: 5.5)
+        _ = light(.omni, Self.C(0.5, 0.65, 1.0), 900, MXVector3(-2.7, 2.2, -2.2), start: 0.5, end: 8)       // window
+        _ = light(.omni, Self.C(0.75, 0.8, 0.95), 420, MXVector3(0, 2.2, 4.5), start: 1, end: 10)               // fill
 
         // the hero, standing on the rug
         let co = context.coordinator

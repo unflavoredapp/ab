@@ -1,92 +1,104 @@
 import SwiftUI
 
-/// Shared top bar for the lobby pages (logo, tabs, currencies, profile, icons). `selected`: 0 HideOut, 1 Play,
-/// 2 Shop, 3 Inventory, 4 Event.
+/// The lobby's top bar (same look as LobbyHome's: blue underline, white selected tab, currencies, profile, icons),
+/// shared by the other lobby pages. `selected`: 0 HideOut, 1 Play, 2 Shop, 3 Inventory, 4 Event.
 struct LobbyTopBar: View {
     @EnvironmentObject var game: Game
     let t: TacData
     let u: CGFloat
     let selected: Int
-    var accent = Color(red: 0.25, green: 0.65, blue: 1.0)
     let act: (LobbyAct) -> Void
 
+    private let blue = Color(red: 0.25, green: 0.65, blue: 1.0)
     private let glass = Color(red: 0.04, green: 0.06, blue: 0.11).opacity(0.78)
     private let edge = Color(red: 0.55, green: 0.7, blue: 1).opacity(0.22)
-
-    private func tab(_ title: String, _ i: Int, _ action: @escaping () -> Void) -> some View {
-        let on = i == selected
-        return Button(action: action) {
-            Text(title).font(.jk(13 * u, on ? .heavy : .semibold)).foregroundColor(on ? accent : .white.opacity(0.62))
-                .padding(.horizontal, 16 * u).frame(height: 44 * u)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(on ? accent : .clear).frame(height: 2 * u).padding(.horizontal, 8 * u)
-                        .shadow(color: accent.opacity(0.9), radius: 5 * u)
-                }
-        }.buttonStyle(.plain)
-    }
 
     private func currency(_ letter: String, _ value: String, _ ring: Color) -> some View {
         HStack(spacing: 6 * u) {
             Text(letter).font(.jk(7 * u, .heavy)).foregroundColor(.black.opacity(0.75))
-                .frame(width: 16 * u, height: 16 * u).background(Circle().fill(ring))
+                .frame(width: 16 * u, height: 16 * u)
+                .background(Circle().fill(ring))
             Text(value).font(.jk(10.5 * u, .semibold)).foregroundColor(.white).monospacedDigit().fixedSize()
         }
         .padding(.horizontal, 9 * u).frame(height: 24 * u)
-        .background(Capsule().fill(glass)).overlay(Capsule().stroke(edge, lineWidth: 1))
+        .background(Capsule().fill(glass))
+        .overlay(Capsule().stroke(edge, lineWidth: 1))
+    }
+
+    private func topNav(_ title: String, _ i: Int, action: @escaping () -> Void) -> some View {
+        let on = i == selected
+        return Button(action: action) {
+            Text(title).font(.jk(13 * u, on ? .heavy : .semibold)).foregroundColor(on ? .white : .white.opacity(0.62))
+                .padding(.horizontal, 18 * u).frame(height: 40 * u)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(on ? blue : .clear).frame(height: 2 * u).padding(.horizontal, 10 * u)
+                        .shadow(color: blue.opacity(0.8), radius: 4 * u)
+                }
+        }.buttonStyle(.plain)
+    }
+
+    private func icon(_ name: String, dot: Bool = false, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name).font(.system(size: 13 * u, weight: .regular)).foregroundColor(.white.opacity(0.7))
+                .frame(width: 30 * u, height: 30 * u)
+                .overlay(alignment: .topTrailing) {
+                    if dot { Circle().fill(Color.red).frame(width: 5 * u, height: 5 * u).offset(x: -6 * u, y: 6 * u) }
+                }
+        }.buttonStyle(.plain)
+    }
+
+    private var profileTile: some View {
+        let xp = TacRank.totalXP(t)
+        let ri = TacRank.index(xp)
+        return Button { act(.ranks) } label: {
+            HStack(spacing: 8 * u) {
+                BladeEmblem().frame(width: 22 * u, height: 25 * u).padding(4 * u)
+                    .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.22, green: 0.04, blue: 0.06)))
+                VStack(alignment: .leading, spacing: 3 * u) {
+                    Text(TacProfile.name.uppercased()).font(.jk(10.5 * u, .heavy)).italic().foregroundColor(.white).lineLimit(1)
+                    HStack(spacing: 6 * u) {
+                        Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
+                        Spacer(minLength: 0)
+                        Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
+                    }
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.14))
+                        Capsule().fill(blue).frame(width: 100 * u * CGFloat(TacRank.progress(xp)))
+                    }
+                    .frame(width: 100 * u, height: 3.5 * u)
+                }
+                .frame(width: 100 * u, alignment: .leading)
+            }
+            .padding(.horizontal, 8 * u).frame(height: 38 * u)
+            .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
+        }.buttonStyle(.plain)
     }
 
     var body: some View {
-        let xp = TacRank.totalXP(t)
-        let ri = TacRank.index(xp)
-        return HStack(spacing: 0) {
-            AirbladeLogo(size: 18 * u).padding(.leading, 26 * u).padding(.trailing, 14 * u)
-            tab("HideOut", 0) { act(.nav(0)) }
-            tab("Play", 1) { act(.screen(1)) }
-            tab("Shop", 2) { act(.nav(6)) }
-            tab("Inventory", 3) { act(.screen(15)) }
-            tab("Event", 4) { act(.season(0)) }
+        HStack(spacing: 0) {
+            AirbladeLogo(size: 18 * u).padding(.leading, 26 * u).padding(.trailing, 18 * u)
+            topNav("HideOut", 0) { act(.nav(0)) }
+            topNav("Play", 1) { act(.screen(1)) }
+            topNav("Shop", 2) { act(.nav(6)) }
+            topNav("Inventory", 3) { act(.screen(15)) }
+            topNav("Event", 4) { act(.season(0)) }
             Spacer(minLength: 6 * u)
-            HStack(spacing: 10 * u) {
+            HStack(spacing: 22 * u) {
                 currency("C", game.s.ex.gems.formatted(), Color(red: 1, green: 0.75, blue: 0.22))
                 currency("ZC", "\(t.rating)", Color(red: 0.4, green: 0.7, blue: 1))
             }
-            .padding(.trailing, 14 * u)
-            Button { act(.ranks) } label: {
-                HStack(spacing: 8 * u) {
-                    BladeEmblem().frame(width: 22 * u, height: 25 * u).padding(4 * u)
-                        .background(RoundedRectangle(cornerRadius: 4 * u).fill(Color(red: 0.22, green: 0.04, blue: 0.06)))
-                    VStack(alignment: .leading, spacing: 3 * u) {
-                        Text(TacProfile.name.uppercased()).font(.jk(10.5 * u, .heavy)).italic().foregroundColor(.white).lineLimit(1)
-                        HStack(spacing: 6 * u) {
-                            Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
-                            Spacer(minLength: 0)
-                            Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
-                        }
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.white.opacity(0.14))
-                            Capsule().fill(Color(red: 0.25, green: 0.65, blue: 1)).frame(width: 96 * u * CGFloat(TacRank.progress(xp)))
-                        }
-                        .frame(width: 96 * u, height: 3.5 * u)
-                    }
-                    .frame(width: 96 * u, alignment: .leading)
-                }
-                .padding(.horizontal, 8 * u).frame(height: 38 * u)
-                .background(RoundedRectangle(cornerRadius: 6 * u).fill(glass))
-                .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(edge, lineWidth: 1))
-            }.buttonStyle(.plain)
+            .padding(.trailing, 24 * u)
+            profileTile
             HStack(spacing: 2 * u) {
-                Button { act(.friends) } label: {
-                    Image(systemName: "envelope.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.75)).frame(width: 30 * u, height: 30 * u)
-                        .overlay(alignment: .topTrailing) { Circle().fill(Color.red).frame(width: 5 * u, height: 5 * u).offset(x: -6 * u, y: 6 * u) }
-                }.buttonStyle(.plain)
-                Button { act(.stats) } label: {
-                    Image(systemName: "gearshape.fill").font(.system(size: 14 * u)).foregroundColor(.white.opacity(0.75)).frame(width: 30 * u, height: 30 * u)
-                }.buttonStyle(.plain)
+                icon("person.2.fill") { act(.friends) }
+                icon("envelope.fill", dot: true) { act(.friends) }
+                icon("gearshape.fill") { act(.stats) }
             }
-            .padding(.leading, 8 * u).padding(.trailing, 14 * u)
+            .padding(.leading, 10 * u).padding(.trailing, 14 * u)
         }
         .frame(height: 44 * u)
-        .background(LinearGradient(colors: [Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.88), Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.3)], startPoint: .top, endPoint: .bottom))
+        .background(LinearGradient(colors: [Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.85), Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.25)], startPoint: .top, endPoint: .bottom))
         .overlay(alignment: .bottom) { Rectangle().fill(edge).frame(height: 1) }
     }
 }
@@ -412,7 +424,7 @@ struct InventoryView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             VStack(spacing: 0) {
-                LobbyTopBar(t: t, u: u, selected: 3, accent: orange, act: act)
+                LobbyTopBar(t: t, u: u, selected: 3, act: act)
                 HStack(spacing: 0) {
                     ForEach(Array(["Storage", "Customize"].enumerated()), id: \.offset) { i, s in
                         Button { subTab = i } label: {

@@ -332,3 +332,98 @@ struct AirbladeDown: View {
         }
     }
 }
+
+/// Combat feedback layered over the view: hit marker, sword combo counter and the elimination callout.
+/// Kept small and brief so the fight stays readable.
+struct AirbladeCombatFX: View {
+    let e: TacticalEngine
+    let W: CGFloat
+    let H: CGFloat
+
+    private let orange = Color(red: 1, green: 0.55, blue: 0.16)
+
+    private var marker: some View {
+        let k = e.hitKind
+        let col: Color = k == 2 ? Color(red: 1, green: 0.2, blue: 0.15) : (k == 1 ? orange : .white)
+        let gap: CGFloat = k == 2 ? 8 : 6, len: CGFloat = k == 2 ? 10 : 7
+        let life = Double(e.hitMarkT / (k == 2 ? 0.35 : 0.22))
+        return Path { p in
+            for (sx, sy) in [(-1.0, -1.0), (1, -1), (1, 1), (-1, 1)] as [(CGFloat, CGFloat)] {
+                p.move(to: CGPoint(x: sx * gap, y: sy * gap))
+                p.addLine(to: CGPoint(x: sx * (gap + len), y: sy * (gap + len)))
+            }
+        }
+        .offsetBy(dx: 20, dy: 20)
+        .stroke(col, style: StrokeStyle(lineWidth: k == 2 ? 2.6 : 2, lineCap: .round))
+        .frame(width: 40, height: 40)
+        .shadow(color: .black.opacity(0.8), radius: 1.5)
+        .opacity(min(1, life * 1.6))
+    }
+
+    private var combo: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("x").font(.jk(16, .heavy)).italic()
+                Text("\(e.comboN)").font(.jk(34, .heavy)).italic()
+            }
+            .foregroundColor(.white)
+            .shadow(color: orange.opacity(0.9), radius: 6)
+            HStack(spacing: 5) {
+                BladeGlyph().fill(orange).frame(width: 28, height: 9)
+                Text("COMBO").font(.jk(10, .heavy)).tracking(2).foregroundColor(orange)
+            }
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.18))
+                Capsule().fill(orange).frame(width: 70 * max(0, min(1, e.comboT / 1.6)))
+            }
+            .frame(width: 70, height: 2.5).padding(.top, 3)
+        }
+        .shadow(color: .black.opacity(0.7), radius: 2)
+    }
+
+    private var calloutView: some View {
+        let t = e.calloutT
+        let fade = Double(min(1, t / 0.4))
+        let pop: CGFloat = t > 2.05 ? 1 + (t - 2.05) * 2 : 1
+        return VStack(spacing: 3) {
+            HStack(spacing: 10) {
+                slashes(flip: false)
+                Text(e.callout).font(.jk(26, .heavy)).italic().tracking(2).foregroundColor(.white)
+                    .shadow(color: orange.opacity(0.85), radius: 8)
+                slashes(flip: true)
+            }
+            Text(e.calloutSub).font(.jk(11, .semibold)).tracking(1).foregroundColor(.white.opacity(0.85))
+                .padding(.horizontal, 12).padding(.vertical, 3)
+                .background(LinearGradient(colors: [.clear, Color.black.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing))
+        }
+        .shadow(color: .black.opacity(0.7), radius: 2)
+        .scaleEffect(pop)
+        .opacity(fade)
+    }
+
+    private func slashes(flip: Bool) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { i in
+                Rectangle().fill(orange.opacity(flip ? 1 - Double(i) * 0.3 : 0.4 + Double(i) * 0.3))
+                    .frame(width: 4, height: 18).rotationEffect(.degrees(22))
+            }
+        }
+    }
+
+    var body: some View {
+        // own 60 fps timeline: the HUD around it refreshes at 10 fps, too slow for a 0.2 s hit marker
+        TimelineView(.animation) { _ in layer }
+            .frame(width: W, height: H)
+            .allowsHitTesting(false)
+    }
+
+    private var layer: some View {
+        ZStack {
+            if e.hitMarkT > 0 { marker.position(x: W / 2, y: H / 2) }
+            if e.comboN >= 2 && e.me.alive { combo.position(x: W / 2 + 130, y: H * 0.5) }
+            if e.calloutT > 0 && !e.callout.isEmpty { calloutView.id(e.calloutSerial).position(x: W / 2, y: H * 0.25) }
+        }
+        .frame(width: W, height: H)
+        .allowsHitTesting(false)
+    }
+}

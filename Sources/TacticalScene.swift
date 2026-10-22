@@ -1880,7 +1880,7 @@ extension TacticalEngine {
             }
             let cx = size.width / 2, hz = size.height / 2
             // no crosshair: hip fire is spread, ADS lines the weapon's own sights up with the view
-            if hitT > 0 {
+            if hitT > 0 && false {   // AIRBLADE: hit marker drawn by AirbladeCombatFX
                 var hm = Path()
                 hm.move(to: CGPoint(x: cx - 9, y: hz - 9)); hm.addLine(to: CGPoint(x: cx + 9, y: hz + 9))
                 hm.move(to: CGPoint(x: cx + 9, y: hz - 9)); hm.addLine(to: CGPoint(x: cx - 9, y: hz + 9))

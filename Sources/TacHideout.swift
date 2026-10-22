@@ -453,3 +453,75 @@ struct LSPanel<C: View>: View {
         .tacBrackets()
     }
 }
+
+/// Tap targets on the hideout art (Resources/hideout_user_bg.jpg): the evidence board opens the mission board,
+/// the weapon rack the loadout, the supply chest the shop. Rects are in the art's own pixels (1705 x 922) and
+/// follow the same aspect-fill the backdrop uses.
+struct HideoutHotspots: View {
+    let size: CGSize
+    let act: (LobbyAct) -> Void
+
+    private struct Spot { let rect: CGRect; let label: String; let icon: String; let act: LobbyAct; let anchor: UnitPoint }
+
+    private let spots: [Spot] = [
+        Spot(rect: CGRect(x: 1015, y: 105, width: 475, height: 330), label: "MISSIONS", icon: "pin.fill", act: .screen(16), anchor: UnitPoint(x: 0.55, y: 0.9)),
+        Spot(rect: CGRect(x: 1135, y: 455, width: 270, height: 300), label: "LOADOUT", icon: "scope", act: .screen(15), anchor: UnitPoint(x: 0.5, y: 0.12)),
+        Spot(rect: CGRect(x: 1405, y: 590, width: 300, height: 300), label: "SUPPLY", icon: "shippingbox.fill", act: .nav(6), anchor: UnitPoint(x: 0.45, y: 0.1))
+    ]
+
+    @State private var pulse = false
+    @State private var pressed: String? = nil
+    private let orange = Color(red: 1, green: 0.55, blue: 0.16)
+
+    var body: some View {
+        if let bg = HideoutBackdrop.userBg {
+            let iw = bg.size.width, ih = bg.size.height
+            let W = size.width, H = size.height
+            let s = max(W / iw, H / ih)
+            let ox = (W - iw * s) / 2, oy = (H - ih * s) / 2
+            let u = min(W / 1024, H / 470)
+            // rects were measured on the 1705 px art; scale them if the file is a different size
+            let k = iw / 1705
+            ZStack(alignment: .topLeading) {
+                ForEach(spots, id: \.label) { sp in
+                    let r = CGRect(x: ox + sp.rect.minX * k * s, y: oy + sp.rect.minY * k * s, width: sp.rect.width * k * s, height: sp.rect.height * k * s)
+                    let on = pressed == sp.label
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6 * u)
+                            .fill(orange.opacity(on ? 0.12 : 0.001))
+                            .overlay(RoundedRectangle(cornerRadius: 6 * u).stroke(orange.opacity(on ? 0.8 : 0), lineWidth: 1.5))
+                        marker(sp, u: u, on: on)
+                            .position(x: r.width * sp.anchor.x, y: r.height * sp.anchor.y)
+                    }
+                    .frame(width: r.width, height: r.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture { act(sp.act) }
+                    .simultaneousGesture(DragGesture(minimumDistance: 0)
+                        .onChanged { _ in if pressed != sp.label { pressed = sp.label } }
+                        .onEnded { _ in pressed = nil })
+                    .position(x: r.midX, y: r.midY)
+                }
+            }
+            .frame(width: W, height: H)
+            .onAppear { withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { pulse = true } }
+        }
+    }
+
+    private func marker(_ sp: Spot, u: CGFloat, on: Bool) -> some View {
+        HStack(spacing: 6 * u) {
+            ZStack {
+                Circle().stroke(orange.opacity(pulse ? 0 : 0.7), lineWidth: 1.5).frame(width: 22 * u, height: 22 * u)
+                    .scaleEffect(pulse ? 1.6 : 1)
+                Circle().fill(Color.black.opacity(0.6)).frame(width: 20 * u, height: 20 * u)
+                Circle().stroke(orange, lineWidth: 1.4).frame(width: 20 * u, height: 20 * u)
+                Image(systemName: sp.icon).font(.system(size: 9 * u, weight: .bold)).foregroundColor(orange)
+            }
+            Text(sp.label).font(.jk(10 * u, .heavy)).tracking(2 * u).foregroundColor(.white)
+                .padding(.horizontal, 8 * u).frame(height: 18 * u)
+                .background(LinearGradient(colors: [Color.black.opacity(0.75), Color.black.opacity(0.35)], startPoint: .leading, endPoint: .trailing))
+                .overlay(alignment: .leading) { Rectangle().fill(orange).frame(width: 2 * u) }
+        }
+        .scaleEffect(on ? 1.08 : 1)
+        .shadow(color: .black.opacity(0.7), radius: 3 * u)
+    }
+}

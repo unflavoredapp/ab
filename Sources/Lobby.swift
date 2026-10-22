@@ -57,6 +57,11 @@ struct LobbyView: View {
                     case 14: CamoLabView(back: { screen = 12 })
                     case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; startMatch() })
                     case 15: InventoryView(t: t, size: g.size, act: homeAct)
+                    case 16: MissionBoardView(t: t, size: g.size, diff: $diff, act: homeAct) { op in
+                        nav.tacMode = op.mode
+                        nav.tacMap = TacLobbyMaps.fallback
+                        startMatch()
+                    }
                     case 5: CSLeague(rating: t.rating, cash: game.s.ex.gems, coins: t.wins) { screen = 0 }
                     case 6:
                         if !fromMatch { loadoutPage(t, g.size) } else { CSLoadout(gun: $nav.tacGun, countdown: fromMatch ? cd : nil, showBattle: fromMatch, gunsmith: nil, ok: { if fromMatch { beginMatch() } else { screen = 4 } }, battle: { beginMatch() }) }

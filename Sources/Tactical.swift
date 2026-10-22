@@ -497,6 +497,24 @@ final class TacticalEngine {
     var wantKnife = false
     var wantGun = false
     var knifeKill = false
+    // AIRBLADE combat feedback (player only)
+    var slashBack = false
+    var hitMarkT: CGFloat = 0
+    var hitKind = 0                 // 0 hit, 1 heavy hit, 2 kill
+    var comboN = 0
+    var comboT: CGFloat = 0
+    var bestCombo = 0
+    var streak = 0
+    var bestStreak = 0
+    var multiN = 0
+    var multiT: CGFloat = 0
+    var swordKills = 0
+    var airKills = 0
+    var backstabs = 0
+    var callout = ""
+    var calloutSub = ""
+    var calloutT: CGFloat = 0
+    var calloutSerial = 0
     var buyT: CGFloat = 0
     var buyOpen = false
     var theme = 0
@@ -838,6 +856,11 @@ final class TacticalEngine {
         }
         bannerT = max(0, bannerT - dt)
         hitT = max(0, hitT - dt)
+        hitMarkT = max(0, hitMarkT - dt)
+        calloutT = max(0, calloutT - dt)
+        multiT = max(0, multiT - dt)
+        comboT = max(0, comboT - dt)
+        if comboT <= 0 { comboN = 0 }
         shake = max(0, shake - dt * 30)
         recoil = max(0, recoil - dt * 2.4)
         jumpT = max(0, jumpT - dt)
@@ -1380,8 +1403,10 @@ final class TacticalEngine {
             let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
             let behind = abs(tAngDiff(v.aim, ang)) < 1.1
             knifeKill = true
+            slashBack = behind
             damage(v, (behind ? ABRules.backstabDmg : (blade ? ABRules.slashDmg : ABRules.knifeDmg)) * (p.isPlayer ? 1 : [0.8, 1, 1][diff]), by: p.id)
             knifeKill = false
+            slashBack = false
             if behind && p.isPlayer { pop(v.pos, "BACKSTAB", TUI.gold) }
             // hit reaction: knocked back and staggered; a fighter in the air is knocked up (juggle)
             let kd = max(0.001, tDist(p.pos, v.pos))
@@ -1479,6 +1504,9 @@ final class TacticalEngine {
         if owner > -2 && impacts.count < 48 { impacts.append(Impact(pos: victim.pos, nx: 0, ny: 0, kind: 1)) }
         if owner == 0 && victim.team != me.team {
             hitT = 0.2
+            hitMarkT = 0.22
+            hitKind = amt >= 45 ? 1 : 0
+            if knifeKill { comboN += 1; comboT = 1.6; bestCombo = max(bestCombo, comboN) }
             pop(victim.pos, "\(Int(max(1, amt)))", amt >= 30 ? TUI.gold : Color.white)
         }
         if victim.isPlayer && owner > -2 { shake = max(shake, 8) }
@@ -1499,8 +1527,9 @@ final class TacticalEngine {
             if let k = killer, k.team != victim.team {
                 k.kills += 1
                 if gameMode == 0 { k.money = min(16000, k.money + 300) }
-                if k.isPlayer { fxT = 1; fxId = killFx; fxSerial += 1 }
+                if k.isPlayer { fxT = 1; fxId = killFx; fxSerial += 1; announceKill(victim, amt: amt) }
             }
+            if victim.isPlayer { streak = 0; comboN = 0; comboT = 0 }
             if let k = killer, k.isPlayer, k.team != victim.team, let msg = TacMeta.addMastery(k.gun) { pop(k.pos, msg, TUI.gold) }
             if gameMode == 6 && !victim.isPlayer { raidBotDrop(victim, by: owner) }
             if gameMode != 0 {
@@ -1518,8 +1547,33 @@ final class TacticalEngine {
             let kn = killer?.name ?? (owner == -1 ? "The Storm" : (owner == -2 ? "Bleeding" : (owner == -3 ? "Toxic Gas" : (owner == -4 ? "Fall" : "?"))))
             feed.append(Feed(text: "\(kn)  >  \(victim.name)", life: 5, mine: killer?.isPlayer == true || victim.isPlayer, k: kn, v: victim.name, kTeam: killer?.team ?? 0, gun: knifeKill ? "knife" : (killer?.gun ?? "pistol"), head: knifeKill ? false : amt >= 45))
             if feed.count > 4 { feed.removeFirst() }
-            pop(victim.pos, "X", .red)
         }
+    }
+
+    /// elimination banner text, multi-kills, streaks and per-match sword stats
+    private func announceKill(_ victim: TPlayer, amt: CGFloat) {
+        let air = pz > ms.ground + TMove.minAirZ * 3 || ms.onWall
+        streak += 1
+        bestStreak = max(bestStreak, streak)
+        multiN = multiT > 0 ? multiN + 1 : 1
+        multiT = 3.5
+        hitKind = 2
+        hitMarkT = 0.35
+        var tags: [String] = []
+        if knifeKill {
+            swordKills += 1
+            if slashBack { backstabs += 1; tags.append("BACKSTAB") }
+            if air { airKills += 1; tags.append("AIR SLASH") }
+            if comboN >= 2 { tags.append("\(comboN)-HIT COMBO") }
+        } else if amt >= 45 {
+            tags.append("HEADSHOT")
+        }
+        if streak == 3 { tags.append("3 STREAK") } else if streak == 5 { tags.append("UNSTOPPABLE") } else if streak >= 8 && streak % 4 == 0 { tags.append("\(streak) STREAK") }
+        callout = ["ELIMINATED", "ELIMINATED", "DOUBLE KILL", "TRIPLE KILL", "QUAD KILL"][min(4, multiN)]
+        if multiN >= 5 { callout = "RAMPAGE" }
+        calloutSub = ([victim.handle.isEmpty ? victim.name : victim.handle] + tags).joined(separator: "  ·  ")
+        calloutT = 2.2
+        calloutSerial += 1
     }
 
     func pop(_ p: CGPoint, _ t: String, _ c: Color) {
@@ -2347,6 +2401,7 @@ struct TacticalPlay: View {
     @State private var rStart: CGPoint? = nil
     @State private var rKnob: CGPoint = .zero
     @State private var collected = false
+    @State private var result: ABResult? = nil
     @State private var autoOn = true
     @State private var bridge: TacScene? = nil
     private var fp: Bool { true }
@@ -2887,6 +2942,7 @@ struct TacticalPlay: View {
                         .buttonStyle(TuiPress())
                         .position(x: 70, y: H * 0.55)
                     }
+                    AirbladeCombatFX(e: e, W: W, H: H).position(x: W / 2, y: H / 2)
                     if e.fxT > 0 && e.fxId != "fx_none" {
                         TacGif(name: e.fxId).id(e.fxSerial)
                             .frame(width: 240, height: 240)
@@ -2926,7 +2982,7 @@ struct TacticalPlay: View {
         TimelineView(.periodic(from: .now, by: 0.1)) { _ in
             ZStack {
                 if engine.paused && !engine.over { pauseView }
-                if engine.over { overView }
+                if engine.over { if engine.gameMode == 6 { overView } else { resultsView } }
                 if !engine.me.alive && !engine.over && !engine.paused {
                     AirbladeDown(e: engine) { showLoadout = true; engine.paused = true }
                 }
@@ -2998,6 +3054,27 @@ struct TacticalPlay: View {
             Text(label).font(.jk(9, .heavy)).tracking(1.5).foregroundColor(.white.opacity(0.55))
         }
         .frame(width: 108, height: 78).tuiGlass(14, fill: 0.35)
+    }
+
+    /// AIRBLADE results: pays out as soon as it opens (so leaving any way keeps the rewards), then shows them
+    @ViewBuilder private var resultsView: some View {
+        if let r = result {
+            AirbladeResults(e: engine, r: r, hideout: { dismiss() }, rematch: {
+                let d = diff
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { nav.tacPlay = d }
+            })
+        } else {
+            Color.black.opacity(0.8).ignoresSafeArea().onAppear(perform: collectResults)
+        }
+    }
+
+    private func collectResults() {
+        guard !collected else { return }
+        collected = true
+        let e = engine
+        let gems = ((e.won ? 25 : 8) + e.kills * 2 + e.scores[0] * 3) * TacRank.mult(game.s.ex.tac?.prestige ?? 0)
+        result = game.airbladeFinish(e, gems: gems)
     }
 
     private var overView: some View {

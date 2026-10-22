@@ -351,6 +351,9 @@ struct LobbyHome: View {
         ZStack(alignment: .topLeading) {
             // the hero stands in the 3D hideout behind this page (HideoutBackdrop in Lobby.swift)
 
+            // the board, rack and chest in the hideout art are buttons
+            HideoutHotspots(size: size, act: act)
+
             newsPanel
                 .padding(.leading, 27 * u).padding(.top, 100 * u)
 

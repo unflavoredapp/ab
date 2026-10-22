@@ -60,6 +60,11 @@ struct OWMapView: View {
     @State private var showHouses = true
     @State private var flat = false
     @State private var zoom: CGFloat = 1
+    @State private var pan = CGSize.zero
+    @State private var rot: CGFloat = 0
+    @State private var pinchBase: CGFloat = 1
+    @State private var panBase = CGSize.zero
+    @State private var rotBase: CGFloat = 0
     @State private var filtersOpen = true
 
     private var u: CGFloat { min(size.width / 1024, size.height / 470) }
@@ -76,9 +81,13 @@ struct OWMapView: View {
     // MARK: map
 
     private func pt(_ p: CGPoint, _ r: CGRect) -> CGPoint {
+        // map point -> rotate about the centre -> tilt (3D squashes the depth) -> zoom -> pan
         let cx = r.midX, cy = r.midY
-        let sx = r.minX + p.x * r.width, sy = r.minY + p.y * r.height * (flat ? 1 : 0.92) + (flat ? 0 : r.height * 0.04)
-        return CGPoint(x: cx + (sx - cx) * zoom, y: cy + (sy - cy) * zoom)
+        let bx = (r.minX + p.x * r.width) - cx, by = (r.minY + p.y * r.height) - cy
+        let a = rot
+        let rx = bx * cos(a) - by * sin(a), ry = bx * sin(a) + by * cos(a)
+        let ty = ry * (flat ? 1 : 0.68)
+        return CGPoint(x: cx + rx * zoom + pan.width, y: cy + ty * zoom + pan.height)
     }
 
     private func path(_ x: OWDistrict, _ r: CGRect) -> Path {
@@ -144,9 +153,30 @@ struct OWMapView: View {
                 }
             }
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onEnded { v in
-                for x in OWDistrict.all where visible(x) && path(x, r).contains(v.location) { pick = x.id }
-            })
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        if hypot(v.translation.width, v.translation.height) > 6 {
+                            pan = CGSize(width: panBase.width + v.translation.width, height: panBase.height + v.translation.height)
+                        }
+                    }
+                    .onEnded { v in
+                        if hypot(v.translation.width, v.translation.height) <= 6 {
+                            for x in OWDistrict.all where visible(x) && path(x, r).contains(v.location) { pick = x.id }
+                        }
+                        panBase = pan
+                    }
+            )
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onChanged { m in zoom = max(0.7, min(3, pinchBase * m)) }
+                    .onEnded { _ in pinchBase = zoom }
+            )
+            .simultaneousGesture(
+                RotationGesture()
+                    .onChanged { a in rot = rotBase + CGFloat(a.radians) }
+                    .onEnded { _ in rotBase = rot }
+            )
         }
     }
 
@@ -279,11 +309,11 @@ struct OWMapView: View {
         VStack(spacing: 3 * u) {
             Image(systemName: "location.north.fill").font(.system(size: 12 * u)).foregroundColor(OW.cyan)
                 .frame(width: 30 * u, height: 30 * u).background(Circle().fill(OW.panel)).overlay(Circle().stroke(OW.edge, lineWidth: 1))
-            tool("sf:plus") { zoom = min(1.6, zoom + 0.15) }
-            tool("sf:minus") { zoom = max(0.8, zoom - 0.15) }
+            tool("sf:plus") { zoom = min(3, zoom + 0.2); pinchBase = zoom }
+            tool("sf:minus") { zoom = max(0.7, zoom - 0.2); pinchBase = zoom }
             tool("3D", !flat) { flat = false }
             tool("2D", flat) { flat = true }
-            tool("sf:scope") { zoom = 1; pick = 4 }
+            tool("sf:scope") { zoom = 1; pinchBase = 1; pan = .zero; panBase = .zero; rot = 0; rotBase = 0; pick = 4 }
         }
     }
 

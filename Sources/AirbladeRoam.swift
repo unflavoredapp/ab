@@ -67,7 +67,6 @@ struct RoamHUD: View {
 
     @EnvironmentObject var game: Game
     @State private var phoneOpen = false
-    @State private var toast = ""
 
     private var pills: some View {
         HStack(spacing: 10) {
@@ -117,74 +116,6 @@ struct RoamHUD: View {
         .background(RoundedRectangle(cornerRadius: 3).fill(Color(red: 0.03, green: 0.05, blue: 0.09).opacity(0.78)))
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.white.opacity(0.2), lineWidth: 1))
         .shadow(color: .black.opacity(0.5), radius: 2)
-    }
-
-    private func app(_ icon: String, _ title: String, badge: Int = 0, _ go: @escaping () -> Void) -> some View {
-        Button(action: go) {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 15, weight: .semibold)).foregroundColor(Color(red: 0.55, green: 0.75, blue: 1))
-                    .frame(width: 38, height: 38)
-                    .background(RoundedRectangle(cornerRadius: 9).fill(Color(red: 0.08, green: 0.12, blue: 0.2)))
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(red: 0.4, green: 0.6, blue: 1).opacity(0.5), lineWidth: 1))
-                    .overlay(alignment: .topTrailing) {
-                        if badge > 0 { Text("\(badge)").font(.jk(7, .heavy)).foregroundColor(.white).frame(width: 12, height: 12).background(Circle().fill(Color.red)).offset(x: 4, y: -4) }
-                    }
-                Text(title).font(.jk(7.5, .medium)).foregroundColor(.white.opacity(0.9))
-            }
-        }.buttonStyle(.plain)
-    }
-
-    private func hideoutOnly(_ s: String) {
-        toast = "\(s) is available at the hideout"
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { toast = "" }
-    }
-
-    private var phone: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "crown.fill").font(.system(size: 11)).foregroundColor(Color(red: 1, green: 0.6, blue: 0.2))
-                Text("HOOD WARS").font(.jk(10, .heavy)).italic().foregroundColor(.white.opacity(0.9))
-                Spacer()
-                Button { phoneOpen = false } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundColor(.white.opacity(0.7)) }.buttonStyle(.plain)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                app("briefcase.fill", "Jobs", badge: e.roam.job == nil ? 3 : 0) { phoneOpen = false; e.roam.jobsOpen = true }
-                app("map.fill", "Map") { hideoutOnly("Map") }
-                app("person.3.fill", "Crew") { hideoutOnly("Crew") }
-                app("bag.fill", "Inventory") { hideoutOnly("Inventory") }
-                app("cart.fill", "Shop") { hideoutOnly("Shop") }
-                app("calendar", "Events") { hideoutOnly("Events") }
-                app("gearshape.fill", "Settings") { phoneOpen = false; e.paused = true }
-                app("photo.fill", "Gallery") { hideoutOnly("Gallery") }
-                app("person.crop.circle.fill", "Contacts") { hideoutOnly("Contacts") }
-            }
-            if !toast.isEmpty { Text(toast).font(.jk(8, .semibold)).foregroundColor(gold).multilineTextAlignment(.center) }
-        }
-        .padding(12).frame(width: 190)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color(red: 0.02, green: 0.03, blue: 0.06).opacity(0.94)))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(red: 0.4, green: 0.6, blue: 1).opacity(0.6), lineWidth: 1.5))
-        .shadow(color: Color.blue.opacity(0.3), radius: 10)
-    }
-
-    private func distText(_ d: CGFloat) -> String { "\(Int(d / 33)) m" }
-
-    /// arrow + distance to the objective
-    private var tracker: some View {
-        Group {
-            if e.roam.job != nil, let t = e.roamMarker {
-                let dx = t.x - e.me.pos.x, dy = t.y - e.me.pos.y
-                let fwd = dx * cos(e.me.aim) + dy * sin(e.me.aim)
-                let rgt = dx * -sin(e.me.aim) + dy * cos(e.me.aim)
-                HStack(spacing: 6) {
-                    Image(systemName: "location.north.fill").font(.system(size: 13, weight: .bold)).foregroundColor(gold)
-                        .rotationEffect(.radians(Double(atan2(rgt, fwd))))
-                    Text(distText(hypot(dx, dy))).font(.jk(10, .heavy)).foregroundColor(.white).monospacedDigit()
-                }
-                .padding(.horizontal, 12).frame(height: 24)
-                .background(Capsule().fill(Color.black.opacity(0.45)))
-                .overlay(Capsule().stroke(gold.opacity(0.5), lineWidth: 1))
-            }
-        }
     }
 
     private var jobsButton: some View {
@@ -258,7 +189,8 @@ struct RoamHUD: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 18).padding(.top, 150)
             if phoneOpen {
-                phone.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing).padding(.trailing, 20)
+                RoamPhone(e: e, close: { phoneOpen = false }, openJobs: { phoneOpen = false; e.roam.jobsOpen = true })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing).padding(.trailing, 20)
             }
             if e.roam.jobsOpen {
                 jobsPanel.frame(maxWidth: .infinity, maxHeight: .infinity)

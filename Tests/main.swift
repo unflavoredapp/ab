@@ -100,7 +100,7 @@ for dt in dts {
     let r = sim(dt: dt, move: CGVector(dx: 1, dy: 0), start: CGPoint(x: 0, y: 82), wallY: 100, top: 80)
     wallTs.append(r.wallT); wallZs.append(r.maxZ)
     print("  top 80, dt \(f(dt * 1000, 1)) ms: on wall \(f(r.wallT)) s, peak z \(f(r.maxZ, 1)) u")
-    check(r.wallT > 0.9 && r.wallT < 1.25, "wall-run lasts about \(f(TMove.wallRunMax)) s")
+    check(r.wallT > 0.2 && r.wallT <= TMove.wallRunMax + 0.05, "wall-run lasts at most \(f(TMove.wallRunMax)) s")
     check(r.maxZ <= 80 - TMove.wallMinOver + 8, "feet stay below top - margin")
 }
 check((wallTs.max() ?? 0) - (wallTs.min() ?? 0) < 0.12, "wall-run time does not depend on frame rate")

@@ -12,7 +12,7 @@ extension TMap {
             return false
         }
         if hitK < 0 { return (maxD, 0) }
-        var top = wallH
+        var top = wallTop
         if hitK < solidKind.count, let kind = solidKind[hitK] { top = propH(kind) }
         return (maxD * best, top)
     }

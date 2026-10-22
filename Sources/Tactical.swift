@@ -595,6 +595,7 @@ final class TacticalEngine {
     var dashT: CGFloat = 0
     var dashCd: CGFloat = 0
     var dashDir = CGVector.zero
+    var ms = TMove.State()
     var dashSpd: CGFloat = 640
     var kick: CGFloat = 0
     var moving: Bool { hypot(move.dx, move.dy) > 0.1 }
@@ -1008,7 +1009,7 @@ final class TacticalEngine {
     }
 
     private func respawnPlayer(_ p: TPlayer) {
-        if p.isPlayer { rbuf.removeAll(); replayOn = false; pz = 0; pvz = 0; wallRunT = 0 }
+        if p.isPlayer { rbuf.removeAll(); replayOn = false; pz = 0; pvz = 0; wallRunT = 0; ms = TMove.State(); dashT = 0 }
         if gameMode == 7 { frontRespawn(p); return }
         var list = p.id % 2 == 0 ? TMap.atkSpawn : TMap.defSpawn
         if gameMode != 0 && gameMode != 6 { list = TMap.spreadPoints(14, sep: 500) + list }
@@ -1229,16 +1230,19 @@ final class TacticalEngine {
         }
         p.pos.x += mv.dx * sp * dt
         p.pos.y += mv.dy * sp * dt
+        // movement state carried between frames (wall run, climb, wall jumps, dash hang time)
+        var vs = ms
+        vs.z = pz; vs.vz = pvz
         dashCd = max(0, dashCd - dt)
         if wantDash {
             wantDash = false
-            if dashCd <= 0 && p.alive {
-                let ml = hypot(mv.dx, mv.dy)
-                dashDir = ml > 0.2 ? CGVector(dx: mv.dx / ml, dy: mv.dy / ml) : CGVector(dx: cos(p.aim), dy: sin(p.aim))
-                dashT = TMove.dashT
-                dashSpd = TMove.dashSpeed
-                dashCd = 0.9
+            if dashCd <= 0 && p.alive, let d = TMove.dash(&vs, move: mv, aim: p.aim) {
+                dashDir = d.dir
+                dashT = d.time
+                dashSpd = d.speed
+                dashCd = d.kind == .ground ? 0.8 : 0.35
                 jumpT = max(jumpT, 0.3)
+                if d.kind == .wall { pop(p.pos, "WALL DASH", TUI.gold) }
             }
         }
         if dashT > 0 {
@@ -1246,11 +1250,11 @@ final class TacticalEngine {
             p.pos.x += dashDir.dx * dashSpd * dt
             p.pos.y += dashDir.dy * dashSpd * dt
         }
-        var vs = TMove.State(z: pz, vz: pvz, wallRunT: wallRunT, wallLock: wallLock, wallGrace: wallGrace, wallN: wallN)
         let vr = TMove.step(&vs, dt: dt, jump: wantJump, move: mv, aim: p.aim, baseSpeed: sp) { a in
             TMap.rayHit(p.pos, a, TMove.wallProbe)
         }
         wantJump = false
+        ms = vs
         pz = vs.z; pvz = vs.vz; wallRunT = vs.wallRunT; wallLock = vs.wallLock; wallGrace = vs.wallGrace; wallN = vs.wallN
         p.pos.x += vr.pushV.dx * dt
         p.pos.y += vr.pushV.dy * dt
@@ -1261,7 +1265,7 @@ final class TacticalEngine {
         TMap.push(&p.pos, 14)
         p.fireCd -= dt
         if wantReload { wantReload = false; startReload(p) }
-        if wantSlash { wantSlash = false; if p.alive && p.fireCd <= 0 { slash(p, blade: true) } }
+        if wantSlash { wantSlash = false; if p.alive && p.fireCd <= 0 { slash(p, blade: true); swordJump(p) } }
         if wantSwap { wantSwap = false; swapGun(p) }
         if wantKnife { wantKnife = false; if !p.knife { p.knife = true; p.reloadT = 0; scoped = false; ads = false; p.fireCd = max(p.fireCd, 0.3) } }
         if wantGun { wantGun = false; if p.knife { p.knife = false; p.fireCd = max(p.fireCd, 0.3) } }
@@ -1269,7 +1273,7 @@ final class TacticalEngine {
             p.reloadT -= dt
             if p.reloadT <= 0 { finishReload(p) }
         } else if firing && p.fireCd <= 0 && !actHeld {
-            if p.knife { slash(p) } else if p.mag > 0 { shoot(p, 0) } else { startReload(p) }
+            if p.knife { slash(p); swordJump(p) } else if p.mag > 0 { shoot(p, 0) } else { startReload(p) }
         }
         if wantNade { wantNade = false; throwNade(p, p.aim, 420) }
         if wantFlash { wantFlash = false; throwNade(p, p.aim, 400, flash: true) }
@@ -1318,6 +1322,17 @@ final class TacticalEngine {
     }
 
     /// melee: hits the nearest enemy in a short front arc; from behind it is an instant kill; also chips breakables in front
+    /// the slash's upward cut lifts you: in the air it launches you higher, next to a wall it keeps you climbing
+    private func swordJump(_ p: TPlayer) {
+        guard p.isPlayer, p.knife, pz > TMove.minAirZ else { return }
+        var vs = ms
+        vs.z = pz; vs.vz = pvz
+        guard TMove.swordLift(&vs) else { return }
+        ms = vs
+        pvz = vs.vz; wallRunT = vs.wallRunT
+        pop(p.pos, "SWORD JUMP", TUI.gold)
+    }
+
     private func slash(_ p: TPlayer, blade: Bool = false) {
         p.fireCd = blade ? 0.38 : 0.55
         p.flash = 0.06
@@ -1338,7 +1353,7 @@ final class TacticalEngine {
             let ang = atan2(v.pos.y - p.pos.y, v.pos.x - p.pos.x)
             let behind = abs(tAngDiff(v.aim, ang)) < 1.1
             knifeKill = true
-            damage(v, behind ? 400 : (blade ? 80 : 55) * (p.isPlayer ? 1 : [0.8, 1, 1][diff]), by: p.id)
+            damage(v, (behind ? ABRules.backstabDmg : (blade ? ABRules.slashDmg : ABRules.knifeDmg)) * (p.isPlayer ? 1 : [0.8, 1, 1][diff]), by: p.id)
             knifeKill = false
             if behind && p.isPlayer { pop(v.pos, "BACKSTAB", TUI.gold) }
             hit = true
@@ -1386,7 +1401,7 @@ final class TacticalEngine {
             // the player's shot follows the camera pitch as well as yaw; spread opens the cone vertically too
             let pa: CGFloat = p.isPlayer ? pitch + CGFloat.random(in: -sprd...sprd) * 0.8 : 0
             var bl = Bullet(pos: CGPoint(x: p.pos.x + cos(a) * muzzle, y: p.pos.y + sin(a) * muzzle),
-                            vel: CGVector(dx: cos(a) * spd, dy: sin(a) * spd), dmg: g.dmg * (p.isPlayer ? am.dmgMul * gm.dmg : [0.85, 1, 1][diff]),
+                            vel: CGVector(dx: cos(a) * spd, dy: sin(a) * spd), dmg: ABRules.bulletDmg(g.dmg * (p.isPlayer ? am.dmgMul * gm.dmg : [0.85, 1, 1][diff]), cls: TWeapons.cls(p.gun)),
                             life: g.range * am.rangeMul / spd + 0.15, owner: p.id, team: p.team, tf: tfl)
             bl.h = p.isPlayer ? (p.crouch ? CGFloat(TMap.eyeH) - 14 : CGFloat(TMap.eyeH)) : 48
             bl.vh = spd * tan(pa)
@@ -2271,6 +2286,7 @@ struct TacticalPlay: View {
     @State private var engine = TacticalEngine()
     @State private var lStart: CGPoint? = nil
     @State private var lActive = false
+    @State private var lastStickTap = Date.distantPast
     @State private var crossLast: CGSize = .zero
     @State private var crossMax: CGFloat = 0
     @State private var lOff: CGSize = .zero
@@ -2475,6 +2491,11 @@ struct TacticalPlay: View {
                         let dx = v.location.x - v.startLocation.x, dy = v.location.y - v.startLocation.y
                         let d = max(0.001, hypot(dx, dy))
                         let k = min(1, d / 58)
+                        if !lActive {
+                            let now = Date()
+                            if now.timeIntervalSince(lastStickTap) < 0.3 { engine.wantDash = true }
+                            lastStickTap = now
+                        }
                         lActive = true
                         lOff = CGSize(width: dx / d * k * 58, height: dy / d * k * 58)
                         var mv = d > 6 ? CGVector(dx: dx / d * k, dy: dy / d * k) : .zero
@@ -2506,13 +2527,6 @@ struct TacticalPlay: View {
                 if fp {
                     // fire sits on the left, above the move stick
                     shootButton.position(x: 84, y: g.size.height - 262)
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            fireButton.padding(.trailing, 70).padding(.bottom, 30)
-                        }
-                    }
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
@@ -2789,17 +2803,13 @@ struct TacticalPlay: View {
                         .buttonStyle(TuiPress()).position(x: W - 36, y: 236)
                     }
                     if e.me.alive {
-                        Button { e.toggleCover() } label: { vbtn("figure.stand", 38, on: e.me.crouch) }
-                            .buttonStyle(TuiPress()).position(x: W - 36, y: H - 96)
-                        Button { e.wantJump = true } label: { vbtn("arrow.up", 38) }
-                            .buttonStyle(TuiPress()).position(x: W - 36, y: H - 44)
-                        Button { e.wantSlash = true } label: { vbtn("line.diagonal", 44) }
-                            .buttonStyle(TuiPress()).position(x: W - 96, y: H - 100)
-                        Button { e.wantDash = true } label: { vbtn("bolt.fill", 38, on: e.dashCd <= 0) }
-                            .buttonStyle(TuiPress()).position(x: W - 92, y: H - 44)
+                        Button { e.toggleCover() } label: { vbtn("figure.stand", 46, on: e.me.crouch) }
+                            .buttonStyle(TuiPress()).position(x: W - 40, y: H - 104)
+                        Button { e.wantJump = true } label: { vbtn("arrow.up", 46) }
+                            .buttonStyle(TuiPress()).position(x: W - 40, y: H - 46)
                         Button { e.wantReload = true } label: { vbtn("arrow.triangle.2.circlepath", 38) }
                             .buttonStyle(TuiPress()).position(x: W - 214, y: H - 40)
-                        AirbladeWeaponBox(e: e).position(x: W - 92, y: 64)
+                        AirbladeWeaponBox(e: e).position(x: W / 2, y: H - 30)
                     } else {
                         Button { e.fast.toggle() } label: {
                             HStack(spacing: 6) {

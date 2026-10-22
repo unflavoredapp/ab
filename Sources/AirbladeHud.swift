@@ -2,8 +2,19 @@ import SwiftUI
 
 /// Match rules and camera numbers shared by the engine and the 3D scene.
 enum ABRules {
-    /// everything hurts more: two to three hits to go down, same for the bots
-    static let dmgMul: CGFloat = 2.3
+    /// no global damage boost: slashes and bullets are tuned below so a full-health, armoured fighter
+    /// takes about 3-5 hits to go down
+    static let dmgMul: CGFloat = 1
+    /// sword slash, quick knife slash and a hit from behind
+    static let slashDmg: CGFloat = 38
+    static let knifeDmg: CGFloat = 30
+    static let backstabDmg: CGFloat = 70
+    /// bullets: rifles, SMGs and pistols hit harder than their base number, shotgun pellets less,
+    /// and no single bullet does more than 60 (so even the sniper needs a few hits)
+    static func bulletDmg(_ base: CGFloat, cls: String) -> CGFloat {
+        let mul: CGFloat = cls == "shotgun" ? 0.6 : (cls == "sniper" ? 1 : 2)
+        return min(60, base * mul)
+    }
     static let hipSpread: CGFloat = 1.5
     /// third-person chase camera: distance behind the player and field of view
     static let camDist: CGFloat = 150

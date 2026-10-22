@@ -13,6 +13,8 @@ enum TMap {
     static var totalW: CGFloat { off * 3 }
     static let th: CGFloat = 14
     static let wallH: CGFloat = 80
+    /// collision / wall-run height of walls: the Town's buildings are full height
+    static var wallTop: CGFloat { kind == 3 ? 260 : wallH }
     static let eyeH: CGFloat = 54
 
     static var kind = 0
@@ -330,7 +332,7 @@ enum TMap {
             // nil kind means a wall or door; props use their authored approximate height.
             let obstacleHeight: CGFloat = {
                 if k < solidKind.count, let kind = solidKind[k] { return propH(kind) }
-                return wallH
+                return wallTop
             }()
             if height >= obstacleHeight { return false }
             let cx = min(max(p.x, o.minX), o.maxX)

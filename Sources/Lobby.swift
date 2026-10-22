@@ -425,7 +425,7 @@ struct LobbyView: View {
         let woods = nav.tacMode == 6
         let m = nav.tacMode
         let tips = ["Pistols are very useful weapons that can save you from a lot of trouble.", "Walls and props can be shot apart. Break cover to flush enemies out.", "Doors can be closed to slow pushes and hide sound.", "Loot the yard, finish your contract and reach an extraction zone alive. Die and you lose the bag."]
-        let mapTitle = (woods || m == 7) ? TMap.mapNames[4] : TacLobbyMaps.title(nav.tacMap)
+        let mapTitle = (woods || m == 7) ? TacLobbyMaps.title(4) : TacLobbyMaps.title(nav.tacMap)
         return ZStack {
             VStack(spacing: 8) {
                 HStack(spacing: 10) {

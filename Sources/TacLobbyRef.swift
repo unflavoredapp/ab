@@ -5,8 +5,10 @@ enum TacLobbyMaps {
     static let ids = [3, 2, 6, 7, 5]
     static let fallback = 3
 
+    private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
+
     static func title(_ k: Int) -> String {
-        TMap.mapNames.indices.contains(k) ? TMap.mapNames[k] : "TOWN"
+        names.indices.contains(k) ? names[k] : "TOWN"
     }
 }
 

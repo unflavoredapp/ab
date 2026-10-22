@@ -1,0 +1,3 @@
+DELETE these two files from your repo before building (they are replaced by AirbladeHud.swift and TacHideout.swift):
+  Sources/TacBodycam.swift
+  Sources/TacBodycamLobby.swift

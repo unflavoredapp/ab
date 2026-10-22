@@ -156,6 +156,27 @@ struct RoamHUD: View {
         .shadow(color: .black.opacity(0.5), radius: 2)
     }
 
+    private func distText(_ d: CGFloat) -> String { "\(Int(d / 33)) m" }
+
+    /// arrow + distance to the objective
+    private var tracker: some View {
+        Group {
+            if e.roam.job != nil, let t = e.roamMarker {
+                let dx = t.x - e.me.pos.x, dy = t.y - e.me.pos.y
+                let fwd = dx * cos(e.me.aim) + dy * sin(e.me.aim)
+                let rgt = dx * -sin(e.me.aim) + dy * cos(e.me.aim)
+                HStack(spacing: 6) {
+                    Image(systemName: "location.north.fill").font(.system(size: 13, weight: .bold)).foregroundColor(gold)
+                        .rotationEffect(.radians(Double(atan2(rgt, fwd))))
+                    Text(distText(hypot(dx, dy))).font(.jk(10, .heavy)).foregroundColor(.white).monospacedDigit()
+                }
+                .padding(.horizontal, 12).frame(height: 24)
+                .background(Capsule().fill(Color.black.opacity(0.45)))
+                .overlay(Capsule().stroke(gold.opacity(0.5), lineWidth: 1))
+            }
+        }
+    }
+
     private var jobsButton: some View {
         Button { phoneOpen.toggle() } label: {
             Image(systemName: "iphone").font(.system(size: 17, weight: .semibold)).foregroundColor(.white)

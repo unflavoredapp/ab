@@ -69,18 +69,36 @@ enum HeroBody {
         holder.addChildNode(fl)
         root.addChildNode(holder)
 
+        // the AIRBLADE sword (Resources/airblade_sword.glb) in the right hand, shown while the blade is out
+        var sword: MXNode? = nil
+        if let su = Bundle.main.url(forResource: "airblade_sword", withExtension: "glb"), let sm = MXGLTF.load(su) {
+            let grip = MXNode()
+            grip.position = MXVector3(11, 34, -3)
+            grip.eulerAngles = MXVector3(0, 0, -1.05)   // tip forward and up
+            sm.scale = MXVector3(S, S, S)
+            sm.position = MXVector3(0, -0.12 * S, 0)    // hold it by the grip
+            grip.addChildNode(sm)
+            grip.isHidden = true
+            root.addChildNode(grip)
+            sword = grip
+        }
+
         let face = MXNode()
         face.isHidden = true
         root.addChildNode(face)
         let sol = TwSoldier(root: root, legL: hips[0], legR: hips[1], holder: holder, variants: variants, flash: fl, shirt: MXMaterial(),
                             face: face, faceMat: MXMaterial(), kev: MXNode(), helm: MXNode(), heavy: MXNode(), hat: MXNode())
-        return (sol, HeroCloth(nodes))
+        let cloth = HeroCloth(nodes)
+        cloth.sword = sword
+        return (sol, cloth)
     }
 }
 
 /// Wind and motion for the hero's cloth panels (used in the hideout and in matches).
 final class HeroCloth {
     private let nodes: [String: MXNode]
+    /// the sword node of an in-match body (nil in the hideout)
+    var sword: MXNode? = nil
     init(_ nodes: [String: MXNode]) { self.nodes = nodes }
 
     /// t: seconds, run: 0 standing ... 1 running, yawVel: how fast the body is turning (cloth lags behind)

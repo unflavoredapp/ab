@@ -728,7 +728,7 @@ final class TacticalEngine {
             if gameMode != 0 && gameMode != 6 { p.armor = 100; p.armorKind = 1 }
             p.blind = 0
             p.pingCd = 0
-            p.knife = false
+            p.knife = true
             p.crouch = false
             p.hiding = false
             p.cover = nil
@@ -1032,6 +1032,7 @@ final class TacticalEngine {
             p.altMag = magSize(p, p.altGun)
             p.altSpare = 99
         }
+        p.knife = true   // AIRBLADE: everyone spawns holding the blade
     }
 
     func finishMatch(_ winner: Int) {
@@ -1781,19 +1782,21 @@ final class TacticalEngine {
             p.aim += max(-mt, min(mt, df))
             p.reactT -= dt
             if p.reactT <= 0 && abs(df) < 0.14 && p.fireCd <= 0 && p.reloadT <= 0 && p.mag > 0 {
-                if d < (gameMode == 8 ? 84 : 46) && Int.random(in: 0..<100) < 70 { slash(p, blade: gameMode == 8) } else { shoot(p, aimErr[diff]) }
+                if p.knife {
+                    if d < 92 { slash(p, blade: true) }
+                } else if d < (gameMode == 8 ? 84 : 46) && Int.random(in: 0..<100) < 70 { slash(p, blade: gameMode == 8) } else { shoot(p, aimErr[diff]) }
             }
             if p.nades > 0 && d > 220 && TMap.floorOf(e.pos) == TMap.floorOf(p.pos) && Double.random(in: 0...1) < Double(dt) * 0.12 {
                 throwNade(p, ang, min(d / 1.4, 470))
             }
             if p.holding && tDist(p.pos, p.ambushPos) < 60 { p.crouch = true; return }
             let pc = TWeapons.cls(p.gun)
-            let pref: CGFloat = (pc == "shotgun" ? 200 : (pc == "smg" ? 320 : (pc == "rifle" ? 460 : (pc == "sniper" ? 700 : 380)))) * (1.2 - 0.5 * p.aggro)
+            let pref: CGFloat = p.knife ? 40 : (pc == "shotgun" ? 200 : (pc == "smg" ? 320 : (pc == "rifle" ? 460 : (pc == "sniper" ? 700 : 380)))) * (1.2 - 0.5 * p.aggro)
             p.strafeT -= dt
             if p.strafeT <= 0 { p.strafe = Bool.random() ? 1 : -1; p.strafeT = CGFloat.random(in: 0.35...1.8) * p.patience }
             p.hideT -= dt
             if p.hideT <= 0 {
-                p.hiding = p.hiding ? false : (p.hp < 50 * (0.5 + p.nerve) || Double.random(in: 0...1) < Double(0.15 + 0.6 * p.nerve * (1.1 - p.aggro)))
+                p.hiding = (p.hiding || p.knife) ? false : (p.hp < 50 * (0.5 + p.nerve) || Double.random(in: 0...1) < Double(0.15 + 0.6 * p.nerve * (1.1 - p.aggro)))
                 p.hideT = p.hiding ? CGFloat.random(in: 0.9...1.8) : CGFloat.random(in: 1.2...2.4)
                 p.cover = p.hiding ? coverSpot(p, e.pos) : nil
             }

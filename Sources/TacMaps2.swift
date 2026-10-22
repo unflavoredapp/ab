@@ -246,16 +246,9 @@ enum TDesert {
         b.rooms.append(TRoom(name: "South Street", r: MapBuilder.R(1, B(120, 595, 700, 665)), mat: 0, fl: 1))
         b.rooms.append(TRoom(name: "West Street", r: MapBuilder.R(1, B(10, 270, 120, 500)), mat: 0, fl: 1))
 
-        // enterable buildings
-        let A = B(120, 270, 290, 590), Bb = B(290, 270, 440, 600), D = B(625, 370, 820, 490)
-        let E = B(385, 490, 665, 595), F = B(695, 490, 820, 600), G = B(545, 670, 890, 880)
-        b.building(1, "Row Houses", A, doors: [("W", 120), ("S", 50)], mat: 3)
-        b.building(1, "Bakery", Bb, doors: [("N", 20), ("S", 20)], mat: 5)
-        b.building(1, "Cafe", D, doors: [("N", 60), ("W", Y(445) - D.minY), ("E", 30)], mat: 3)
-        b.building(1, "Archive", E, doors: [("N", X(480) - E.minX), ("S", 150)], mat: 5)
-        b.building(1, "Clinic", F, doors: [("S", 10), ("E", 80)], mat: 3)
-        b.building(1, "Town Hall", G, doors: [("N", X(740) - G.minX), ("S", 200)], mat: 5)
-
+        // the blocks between the streets are closed buildings (solid, like GunZ): anything that is not
+        // a street stays solid and is drawn as a building front
+        b.doors = []   // no doors: doorways are open archways
         let layout = b.layout([.concrete, .brick, .concrete])
         let rc = b.rc
         func prop(_ k: PropKind, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) { b.p(1, k, X(x), Y(y), w, h) }
@@ -272,14 +265,6 @@ enum TDesert {
         prop(.barrel, 530, 640, 36, 36); prop(.sandbag, 330, 620, 130, 32); prop(.crate, 210, 630, 80, 60)
         prop(.barrel, 60, 600, 36, 36); prop(.crate, 80, 420, 70, 70); prop(.sandbag, 60, 330, 32, 100)
         prop(.crate, 760, 620, 80, 60); prop(.car, 470, 420, 56, 100)
-        // interiors
-        prop(.counter, 150, 300, 130, 36); prop(.table, 210, 480, 120, 60)
-        prop(.shelf, 305, 300, 28, 110); prop(.table, 340, 460, 100, 60)
-        prop(.counter, 660, 395, 120, 36); prop(.table, 700, 440, 100, 60)
-        prop(.shelf, 400, 515, 150, 28); prop(.crate, 600, 545, 60, 50); prop(.table, 480, 545, 140, 60)
-        prop(.couch, 710, 520, 100, 50); prop(.table, 760, 560, 60, 40)
-        prop(.couch, 600, 700, 160, 60); prop(.table, 760, 740, 160, 70); prop(.shelf, 860, 690, 28, 120); prop(.crate, 620, 810, 70, 60)
-
         let keep: [CGRect] = b.outers.map { $0.insetBy(dx: -40, dy: -40) }
         _ = keep
         let spawnPts: [CGPoint] = [P(70, 130), P(70, 240), P(200, 220), P(380, 215), P(540, 215), P(700, 180), P(780, 270), P(560, 330),

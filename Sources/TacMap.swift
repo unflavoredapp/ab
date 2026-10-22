@@ -88,7 +88,7 @@ enum TMap {
 
     static func site(_ i: Int) -> CGRect { i == 0 ? siteA : siteB }
     static var siteNames: [String] { cur.siteNames }
-    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
+    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE YARD", "DESERT OUTPOST", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
 
     static func roomName(_ p: CGPoint) -> String {
         for r in rooms where r.r.contains(p) { return r.name }
@@ -161,7 +161,7 @@ enum TMap {
     static var solid: [CGRect] = origBase + cur.layout.doors
     static var solidKind: [PropKind?] = cur.layout.walls.map { _ -> PropKind? in nil } + cur.props.map { Optional($0.k) } + cur.layout.doors.map { _ -> PropKind? in nil }
     static var solidMat: [WallMat] = cur.layout.mats + cur.props.map { TMap.propMat($0.k) } + cur.layout.doors.map { _ -> WallMat in .wood }
-    static var maxHP: [CGFloat] = cur.layout.walls.map { min($0.width, $0.height) <= 25.01 ? 110 : -1 } + cur.props.map { propHP($0.k) }
+    static var maxHP: [CGFloat] = cur.layout.walls.map { _ in CGFloat(-1) } + cur.props.map { _ in CGFloat(-1) }
     static var hp: [CGFloat] = maxHP
     static var broken: [Int] = []          // pending events for the 3D scene
     static var brokenAll: [Int] = []       // everything broken this round (radar overlay)
@@ -206,7 +206,7 @@ enum TMap {
         solid = origBase + d.layout.doors
         solidKind = d.layout.walls.map { _ -> PropKind? in nil } + d.props.map { Optional($0.k) } + d.layout.doors.map { _ -> PropKind? in nil }
         solidMat = d.layout.mats + d.props.map { TMap.propMat($0.k) } + d.layout.doors.map { _ -> WallMat in .wood }
-        maxHP = d.layout.walls.map { min($0.width, $0.height) <= 25.01 && k != 7 ? 110 : -1 } + d.props.map { propHP($0.k) }
+        maxHP = d.layout.walls.map { _ in CGFloat(-1) } + d.props.map { _ in CGFloat(-1) }   // AIRBLADE maps are not destructible
         hp = maxHP
         broken = []; brokenAll = []; breaches = []
         floorIdx = makeFloorIdx()

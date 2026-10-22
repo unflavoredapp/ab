@@ -1617,7 +1617,11 @@ final class TacScene {
                     legLs[i].eulerAngles = MXVector3(0, 0, sw)
                     legRs[i].eulerAngles = MXVector3(0, 0, -sw)
                 }
-                if i < heroClothIdx.count, let hc = heroCloth[heroClothIdx[i]] { hc.update(t: Float(e.time), run: mvK[i], yawVel: 0) }
+                if i < heroClothIdx.count, let hc = heroCloth[heroClothIdx[i]] {
+                    hc.update(t: Float(e.time), run: mvK[i], yawVel: 0)
+                    hc.sword?.isHidden = !p.knife
+                    if p.knife { guns[i].isHidden = true }
+                }
                 let bob = abs(Float(cos(walkPh[i]))) * 0.9 * mvK[i] + sin(Float(e.time) * 1.6 + Float(i)) * 0.12
                 let lean: Float = -0.1 * mvK[i] + (p.flash > 0 ? 0.045 : 0)
                 bodies[i].eulerAngles = MXVector3(0, 0, lean)

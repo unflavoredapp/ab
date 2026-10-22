@@ -6,7 +6,7 @@ enum ABRules {
     static let dmgMul: CGFloat = 2.3
     static let hipSpread: CGFloat = 1.5
     /// third-person chase camera: distance behind the player and field of view
-    static let camDist: CGFloat = 78
+    static let camDist: CGFloat = 150
     static let camFov: CGFloat = 66
     /// real 3D gun models only (no pixel-art swaps) and no first-person radar
     static let realGunModels = true
@@ -45,50 +45,55 @@ struct AirbladeHud: View {
 
     private func vitals(hp: Int, armor: Int) -> some View {
         let hpFrac = CGFloat(min(100, max(0, hp))) / 100
-        return HStack(alignment: .top, spacing: 8) {
+        let bw: CGFloat = 165
+        return HStack(alignment: .center, spacing: 6) {
             ZStack {
-                Circle().fill(Color.black.opacity(0.6))
+                Circle().fill(Color.black.opacity(0.45))
                 Circle().trim(from: 0, to: CGFloat(max(0.08, TacRank.progress(xp))))
-                    .stroke(Color(red: 0.35, green: 0.85, blue: 0.75), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .stroke(Color(red: 0.35, green: 0.85, blue: 0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                VStack(spacing: -1) {
-                    Text("lv").font(.system(size: 8, weight: .bold)).foregroundColor(.white.opacity(0.7))
-                    Text("\(level)").font(.system(size: 13, weight: .heavy)).foregroundColor(.white)
+                VStack(spacing: -2) {
+                    Text("Lv").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white.opacity(0.75))
+                    Text("\(level)").font(.system(size: 11, weight: .heavy)).foregroundColor(.white)
                 }
             }
-            .frame(width: 38, height: 38)
+            .frame(width: 28, height: 28)
+            Rectangle().fill(Color.white.opacity(0.35)).frame(width: 1, height: 24)
             VStack(alignment: .leading, spacing: 3) {
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(ABHud.ink)
-                    Rectangle().fill(hp < 35 ? Color(red: 1, green: 0.35, blue: 0.3) : Color.white.opacity(0.92)).frame(width: 210 * hpFrac)
+                    Rectangle().fill(Color.black.opacity(0.35))
+                    Rectangle().fill(hp < 35 ? Color(red: 1, green: 0.4, blue: 0.35) : Color.white.opacity(0.9)).frame(width: bw * hpFrac)
                 }
-                .frame(width: 210, height: 16)
+                .frame(width: bw, height: 9)
+                .overlay(Rectangle().stroke(Color.white.opacity(0.35), lineWidth: 0.5))
                 .overlay(alignment: .trailing) {
-                    Text("\(hp)").font(.system(size: 13, weight: .heavy, design: .monospaced)).foregroundColor(hp < 35 ? .white : .black).padding(.trailing, 6)
+                    Text("\(hp)").font(.system(size: 9, weight: .bold)).foregroundColor(.white).shadow(color: .black, radius: 1).offset(y: -9).padding(.trailing, 2)
                 }
-                HStack(spacing: 2) {
+                HStack(spacing: 1.5) {
                     ForEach(0..<3, id: \.self) { i in
                         let seg = min(1, max(0, CGFloat(armor) / 100 * 3 - CGFloat(i)))
                         ZStack(alignment: .leading) {
-                            Rectangle().fill(ABHud.ink)
-                            Rectangle().fill(Color(red: 0.22, green: 0.52, blue: 1)).frame(width: 68 * seg)
+                            Rectangle().fill(Color.black.opacity(0.35))
+                            Rectangle().fill(Color(red: 0.2, green: 0.47, blue: 0.85)).frame(width: (bw - 3) / 3 * seg)
                         }
-                        .frame(width: 68, height: 11)
+                        .frame(width: (bw - 3) / 3, height: 7)
                     }
                 }
+                .overlay(Rectangle().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
                 .overlay(alignment: .trailing) {
-                    Text("\(armor)").font(.system(size: 10, weight: .heavy, design: .monospaced)).foregroundColor(.white).shadow(color: .black, radius: 1).padding(.trailing, 6)
+                    Text("\(armor)").font(.system(size: 8.5, weight: .bold)).foregroundColor(.white).shadow(color: .black, radius: 1).offset(y: -8).padding(.trailing, 2)
                 }
             }
+            .padding(.top, 6)
         }
     }
 
     // MARK: match strip
 
     private func box(_ n: Int, _ fill: Color) -> some View {
-        Text("\(n)").font(.system(size: 15, weight: .heavy, design: .monospaced)).monospacedDigit().foregroundColor(.white)
-            .frame(minWidth: 38).frame(height: 20)
-            .background(fill)
+        Text("\(n)").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundColor(.white)
+            .frame(minWidth: 34).frame(height: 18)
+            .background(fill.opacity(0.9))
     }
 
     private func strip(_ me: TPlayer) -> some View {
@@ -96,15 +101,18 @@ struct AirbladeHud: View {
         let versus = [1, 2, 5, 8].contains(mode)
         let objective = [1, 2, 4, 5, 8].contains(mode)
         return Button(action: openBoard) {
-            VStack(spacing: 3) {
-                shadowed(Text(ABRules.mmss(Double(max(0, e.timer)))).font(.system(size: 17, weight: .bold, design: .monospaced)).foregroundColor(.white))
+            VStack(spacing: 2) {
+                shadowed(Text(ABRules.mmss(Double(max(0, e.timer)))).font(.system(size: 15, weight: .semibold)).monospacedDigit().foregroundColor(.white))
                 HStack(spacing: 0) {
-                    box(objective ? score(me.team) : me.kills, ABHud.blue)
-                    Text(objective ? "KILL \(e.killTarget)" : "KILLS").font(.system(size: 10, weight: .heavy)).foregroundColor(.white.opacity(0.9))
-                        .frame(minWidth: 62).frame(height: 20).background(ABHud.ink)
-                    if versus { box(score(1 - me.team), ABHud.red) }
+                    if versus { box(score(me.team), ABHud.blue) }
+                    Text(objective ? "KILL \(e.killTarget)" : "KILLS").font(.system(size: 8, weight: .semibold)).tracking(1).foregroundColor(.white.opacity(0.75))
+                        .frame(minWidth: 52).frame(height: 18)
+                    box(versus ? score(1 - me.team) : me.kills, versus ? ABHud.red : ABHud.blue)
                 }
+                .background(Color.white.opacity(0.12))
             }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(LinearGradient(colors: [Color.white.opacity(0.14), Color.white.opacity(0.04)], startPoint: .top, endPoint: .bottom))
         }
         .buttonStyle(.plain)
     }
@@ -121,8 +129,9 @@ struct AirbladeHud: View {
                         .foregroundColor(item.head ? Color(red: 1, green: 0.72, blue: 0.24) : .white.opacity(0.6))
                     Text(item.v.isEmpty ? "ELIMINATED" : item.v).foregroundColor(ally ? ABHud.foeText : ABHud.allyText).lineLimit(1)
                 }
-                .font(.jk(12, .heavy))
-                .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
+                .font(.jk(9, .semibold))
+                .padding(.horizontal, 5).frame(height: 14)
+                .background(Color.black.opacity(0.35))
                 .transition(.opacity)
             }
         }
@@ -135,16 +144,16 @@ struct AirbladeHud: View {
         return ZStack {
             vitals(hp: hp, armor: armor)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 14).padding(.top, 10)
+                .padding(.leading, 18).padding(.top, 10)
             strip(me)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 8)
             feed(me)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 62).padding(.trailing, 14)
+                .padding(.top, 10).padding(.trailing, 64)
                 .allowsHitTesting(false)
             if me.alive {
-                Circle().stroke(Color.white.opacity(0.8), lineWidth: 1.5).frame(width: 11, height: 11)
+                Circle().stroke(Color.white.opacity(0.75), lineWidth: 1).frame(width: 9, height: 9)
                     .shadow(color: .black.opacity(0.7), radius: 1.5)
                     .allowsHitTesting(false)
             }
@@ -262,45 +271,41 @@ struct AirbladeWeaponBox: View {
     var body: some View {
         let me = e.me
         let g = TGuns.get(me.gun)
-        let pistol = TWeapons.isPistol(me.gun)
         return Button { e.wantSwap = true } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .top) {
                     if me.reloadT > 0 {
-                        Text("RELOAD").font(.system(size: 11, weight: .heavy, design: .monospaced)).foregroundColor(Color(red: 1, green: 0.7, blue: 0.2))
+                        Text("RELOAD").font(.system(size: 10, weight: .heavy)).foregroundColor(Color(red: 1, green: 0.7, blue: 0.2))
+                    } else if me.knife {
+                        Text("∞").font(.system(size: 17, weight: .semibold)).foregroundColor(.white)
                     } else {
-                        Text(me.knife ? "∞" : "\(me.mag)")
-                            .font(.system(size: me.knife ? 26 : 22, weight: .heavy, design: .monospaced))
-                            .foregroundColor(!me.knife && me.mag == 0 ? Color.red : .white)
-                        if !me.knife {
-                            Text(pistol ? "ROUNDS" : "/ \(me.spare * g.mag)")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundColor(.white.opacity(0.55))
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text("\(me.mag)").font(.system(size: 15, weight: .semibold)).monospacedDigit()
+                                .foregroundColor(me.mag == 0 ? Color(red: 1, green: 0.35, blue: 0.3) : .white)
+                            Text("/ \(me.spare * g.mag)").font(.system(size: 8.5, weight: .medium)).foregroundColor(.white.opacity(0.55))
                         }
                     }
-                }
-                .frame(width: 64, alignment: .leading)
-                VStack(spacing: 2) {
+                    Spacer(minLength: 4)
                     if me.knife {
-                        BladeGlyph().fill(Color.white.opacity(0.9)).frame(width: 52, height: 24)
+                        BladeGlyph().fill(Color.white.opacity(0.85)).frame(width: 56, height: 18)
                     } else {
-                        Image(uiImage: GunSprites.icon(TWeapons.rig(me.gun))).resizable().scaledToFit()
-                            .frame(width: 70, height: 26)
+                        Image(uiImage: GunSprites.icon(TWeapons.rig(me.gun))).resizable().scaledToFit().frame(width: 62, height: 20)
                     }
-                    Text((me.knife ? "AIRBLADE" : g.name).uppercased())
-                        .font(.jk(10, .semibold)).foregroundColor(.white.opacity(0.9)).lineLimit(1)
                 }
-                .frame(width: 80)
+                Spacer(minLength: 0)
+                Text(me.knife ? "Airblade" : g.name).font(.jk(9.5, .semibold)).foregroundColor(.white.opacity(0.92)).lineLimit(1)
             }
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .frame(width: 176, height: 56)
-            .background(Color.black.opacity(0.6))
-            .overlay(Rectangle().stroke(Color.white.opacity(0.22), lineWidth: 1))
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .frame(width: 150, height: 48)
+            .background(Color.black.opacity(0.45))
+            .overlay(Rectangle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+            .overlay(alignment: .bottom) { Rectangle().fill(Color(red: 0.3, green: 0.85, blue: 0.95).opacity(0.85)).frame(height: 1.5) }
         }
         .buttonStyle(.plain)
     }
 }
 
-/// shown while down: auto redeploy, tap for loadout
+/// shown while down: auto redeploy
 struct AirbladeDown: View {
     let e: TacticalEngine
     let loadout: () -> Void
@@ -312,11 +317,6 @@ struct AirbladeDown: View {
                 if e.me.respawn > 0 && e.me.respawn < 100 {
                     Text("REDEPLOY IN \(Int(ceil(e.me.respawn)))").font(.jk(13, .semibold)).foregroundColor(.white.opacity(0.85))
                 }
-                Button(action: loadout) {
-                    Text("LOADOUT").font(.jk(13, .heavy)).foregroundColor(.white)
-                        .padding(.horizontal, 18).padding(.vertical, 7).overlay(Rectangle().stroke(Color.white.opacity(0.6), lineWidth: 1))
-                }
-                .buttonStyle(TuiPress())
             }
         }
     }

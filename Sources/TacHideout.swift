@@ -76,7 +76,7 @@ struct HideoutBackdrop: View {
             }
 
             // ---- window with the night city
-            let win = CGRect(x: w * 0.0, y: h * 0.07, width: w * 0.385, height: h * 0.64)
+            let win = CGRect(x: w * 0.0, y: h * 0.0, width: w * 0.47, height: h * 0.64)
             ctx.fill(Path(win), with: .linearGradient(Gradient(colors: [col(0.05, 0.09, 0.15), col(0.1, 0.16, 0.22), col(0.2, 0.22, 0.26)]), startPoint: CGPoint(x: 0, y: win.minY), endPoint: CGPoint(x: 0, y: win.maxY)))
             // far skyline, then near skyline
             for layer in 0..<2 {
@@ -151,13 +151,13 @@ struct HideoutBackdrop: View {
             ctx.fill(Path(CGRect(x: win.minX, y: win.maxY, width: win.width + 16, height: 8)), with: .color(col(0.16, 0.15, 0.14)))
 
             // ---- shooting-range poster and wanted notices between window and board
-            ctx.fill(Path(CGRect(x: w * 0.405, y: h * 0.2, width: w * 0.034, height: h * 0.13)), with: .color(col(0.2, 0.42, 0.24)))
-            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.41, y: h * 0.225, width: w * 0.024, height: w * 0.024)), with: .color(col(0.1, 0.25, 0.13)))
-            ctx.fill(Path(CGRect(x: w * 0.445, y: h * 0.27, width: w * 0.034, height: h * 0.15)), with: .color(col(0.62, 0.55, 0.42)))
-            ctx.fill(Path(CGRect(x: w * 0.452, y: h * 0.29, width: w * 0.02, height: h * 0.05)), with: .color(col(0.25, 0.2, 0.15)))
+            ctx.fill(Path(CGRect(x: w * 0.495, y: h * 0.24, width: w * 0.034, height: h * 0.13)), with: .color(col(0.2, 0.42, 0.24)))
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.5, y: h * 0.265, width: w * 0.024, height: w * 0.024)), with: .color(col(0.1, 0.25, 0.13)))
+            ctx.fill(Path(CGRect(x: w * 0.54, y: h * 0.22, width: w * 0.036, height: h * 0.15)), with: .color(col(0.62, 0.55, 0.42)))
+            ctx.fill(Path(CGRect(x: w * 0.547, y: h * 0.24, width: w * 0.02, height: h * 0.05)), with: .color(col(0.25, 0.2, 0.15)))
 
             // ---- evidence board
-            let board = CGRect(x: w * 0.575, y: h * 0.16, width: w * 0.385, height: h * 0.36)
+            let board = CGRect(x: w * 0.635, y: h * 0.1, width: w * 0.305, height: h * 0.36)
             ctx.fill(Path(board.insetBy(dx: -9, dy: -9)), with: .linearGradient(Gradient(colors: [col(0.05, 0.05, 0.055), col(0.14, 0.13, 0.12)]), startPoint: board.origin, endPoint: CGPoint(x: board.maxX, y: board.maxY)))
             ctx.fill(Path(board), with: .color(col(0.36, 0.3, 0.23)))
             for i in 0..<26 {
@@ -190,17 +190,37 @@ struct HideoutBackdrop: View {
                 ctx.stroke(needle, with: .color(col(0.5, 0.05, 0.05)), lineWidth: 1.4)
             }
 
-            // ---- weapon rack
-            ctx.fill(Path(CGRect(x: w * 0.75, y: h * 0.5, width: w * 0.2, height: 6)), with: .color(col(0.1, 0.09, 0.08)))
-            ctx.fill(Path(CGRect(x: w * 0.75, y: h * 0.7, width: w * 0.2, height: 6)), with: .color(col(0.1, 0.09, 0.08)))
-            for i in 0..<7 {
-                let x = w * 0.765 + CGFloat(i) * w * 0.025
-                var gun = Path()
-                gun.move(to: CGPoint(x: x - CGFloat(i % 3) * 2, y: h * 0.76)); gun.addLine(to: CGPoint(x: x + 1 + CGFloat(i % 2) * 3, y: h * 0.4 + CGFloat((i * 13) % 4) * h * 0.02))
-                ctx.stroke(gun, with: .color(col(0.045, 0.05, 0.055)), lineWidth: 5)
-                ctx.fill(Path(CGRect(x: x - 3, y: h * 0.5 - 2, width: 8, height: 4)), with: .color(col(0.3, 0.3, 0.28)))
-                ctx.fill(Path(CGRect(x: x - 5, y: h * 0.62, width: 7, height: h * 0.1)), with: .color(col(0.06, 0.065, 0.07)))
-                ctx.fill(Path(CGRect(x: x + 1, y: h * 0.52, width: 3, height: h * 0.05)), with: .color(col(0.2, 0.2, 0.19, 0.7)))
+            // ---- weapon rack: wooden rack with rifles leaning in it
+            let rk = CGRect(x: w * 0.72, y: h * 0.5, width: w * 0.15, height: h * 0.37)
+            let wood = col(0.22, 0.15, 0.1), woodHi = col(0.36, 0.25, 0.16)
+            ctx.fill(Path(CGRect(x: rk.minX, y: rk.maxY - h * 0.03, width: rk.width, height: h * 0.03)), with: .color(wood))
+            ctx.fill(Path(CGRect(x: rk.minX, y: rk.minY + h * 0.06, width: rk.width, height: h * 0.022)), with: .color(wood))
+            ctx.fill(Path(CGRect(x: rk.minX, y: rk.minY + h * 0.06, width: rk.width, height: 2)), with: .color(woodHi))
+            for px in [rk.minX, rk.maxX - w * 0.008] {
+                ctx.fill(Path(CGRect(x: px, y: rk.minY + h * 0.03, width: w * 0.008, height: rk.height - h * 0.03)), with: .color(wood))
+            }
+            func rifle(_ bx: CGFloat, _ by: CGFloat, _ L: CGFloat, _ lean: CGFloat, _ kind: Int) {
+                var g = ctx
+                g.translateBy(x: bx, y: by)
+                g.rotate(by: .radians(Double(lean)))
+                var r = Path()
+                r.move(to: CGPoint(x: -0.05 * L, y: 0)); r.addLine(to: CGPoint(x: 0.05 * L, y: 0))
+                r.addLine(to: CGPoint(x: 0.035 * L, y: -0.26 * L)); r.addLine(to: CGPoint(x: 0.045 * L, y: -0.26 * L))
+                r.addLine(to: CGPoint(x: 0.045 * L, y: -0.56 * L)); r.addLine(to: CGPoint(x: 0.02 * L, y: -0.6 * L))
+                r.addLine(to: CGPoint(x: 0.012 * L, y: -1.0 * L)); r.addLine(to: CGPoint(x: -0.012 * L, y: -1.0 * L))
+                r.addLine(to: CGPoint(x: -0.02 * L, y: -0.6 * L)); r.addLine(to: CGPoint(x: -0.045 * L, y: -0.56 * L))
+                r.addLine(to: CGPoint(x: -0.045 * L, y: -0.26 * L)); r.addLine(to: CGPoint(x: -0.03 * L, y: -0.26 * L))
+                r.closeSubpath()
+                // magazine and grip
+                r.addRect(CGRect(x: 0.04 * L, y: -0.44 * L, width: (kind == 1 ? 0.1 : 0.07) * L, height: 0.1 * L))
+                r.addRect(CGRect(x: 0.04 * L, y: -0.32 * L, width: 0.05 * L, height: 0.05 * L))
+                if kind == 2 { r.addRect(CGRect(x: -0.025 * L, y: -0.7 * L, width: 0.05 * L, height: 0.05 * L)) }   // scope
+                g.fill(r, with: .color(col(0.06, 0.065, 0.07)))
+                g.stroke(r, with: .color(col(0.3, 0.31, 0.32, 0.55)), lineWidth: 0.7)
+            }
+            for i in 0..<6 {
+                let bx = rk.minX + w * 0.015 + CGFloat(i) * rk.width / 6.2
+                rifle(bx, rk.maxY - h * 0.03, h * (0.4 + CGFloat(i % 3) * 0.025), -0.06 + CGFloat(i % 2) * 0.05, i % 3)
             }
 
             // ---- workbench with books and a lamp
@@ -244,36 +264,6 @@ struct HideoutBackdrop: View {
             ctx.stroke(Path(locker), with: .color(col(0.28, 0.28, 0.27)), lineWidth: 2)
             ctx.fill(Path(CGRect(x: locker.midX - 5, y: locker.minY + 14, width: 10, height: 14)), with: .color(col(0.75, 0.38, 0.12)))
 
-            // ---- ceiling beams and trusses
-            ctx.fill(Path(CGRect(x: 0, y: 0, width: w, height: h * 0.045)), with: .color(col(0.045, 0.04, 0.035)))
-            for i in 0..<5 {
-                let bx = w * (0.08 + CGFloat(i) * 0.22)
-                var truss = Path()
-                truss.move(to: CGPoint(x: bx, y: 0)); truss.addLine(to: CGPoint(x: bx + w * 0.07, y: h * 0.13))
-                ctx.stroke(truss, with: .color(col(0.05, 0.045, 0.04, 0.9)), lineWidth: 7)
-            }
-            // ---- neon / bokeh lights in the city
-            for (k, c) in [(0.07, col(1, 0.35, 0.55)), (0.15, col(0.35, 0.8, 1)), (0.24, col(1, 0.75, 0.35)), (0.31, col(0.5, 0.6, 1)), (0.2, col(1, 0.45, 0.4)), (0.05, col(0.4, 0.9, 0.8))] as [(CGFloat, Color)] {
-                let cx = w * k, cy = h * (0.26 + k * 0.5)
-                ctx.fill(Path(ellipseIn: CGRect(x: cx - 18, y: cy - 18, width: 36, height: 36)), with: .radialGradient(Gradient(colors: [c.opacity(0.4), .clear]), center: CGPoint(x: cx, y: cy), startRadius: 1, endRadius: 18))
-            }
-            // ---- hanging banner with the blade emblem
-            let ban = CGRect(x: w * 0.235, y: h * 0.24, width: w * 0.09, height: h * 0.27)
-            ctx.fill(Path(ban), with: .linearGradient(Gradient(colors: [col(0.12, 0.1, 0.11), col(0.06, 0.05, 0.06)]), startPoint: ban.origin, endPoint: CGPoint(x: ban.minX, y: ban.maxY)))
-            ctx.stroke(Path(ban), with: .color(col(0.3, 0.27, 0.26, 0.6)), lineWidth: 1.2)
-            var em = Path()
-            em.move(to: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.14))
-            em.addLine(to: CGPoint(x: ban.maxX - ban.width * 0.14, y: ban.minY + ban.height * 0.3)); em.addLine(to: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.62)); em.addLine(to: CGPoint(x: ban.minX + ban.width * 0.14, y: ban.minY + ban.height * 0.3)); em.closeSubpath()
-            ctx.fill(em, with: .color(col(0.62, 0.08, 0.1)))
-            ctx.draw(Text("AIRBLADE").font(.system(size: max(7, w * 0.0085), weight: .black).italic()).foregroundColor(col(0.8, 0.8, 0.82, 0.8)), at: CGPoint(x: ban.midX, y: ban.minY + ban.height * 0.82), anchor: .center)
-            // ---- pinned photos get a face each
-            for i in 0..<26 where i % 2 == 0 {
-                let pw = CGFloat(20 + (i * 11) % 26), ph = CGFloat(15 + (i * 7) % 22)
-                let px = board.minX + 6 + CGFloat((i * 37) % 97) / 100 * (board.width - pw - 12)
-                let py = board.minY + 6 + CGFloat((i * 23) % 91) / 100 * (board.height - ph - 12)
-                ctx.fill(Path(ellipseIn: CGRect(x: px + pw * 0.36, y: py + ph * 0.18, width: pw * 0.28, height: ph * 0.34)), with: .color(col(0.12, 0.1, 0.09, 0.8)))
-                ctx.fill(Path(CGRect(x: px + pw * 0.24, y: py + ph * 0.56, width: pw * 0.52, height: ph * 0.32)), with: .color(col(0.12, 0.1, 0.09, 0.7)))
-            }
             // ---- desk lamp with a green shade, a helmet and a second ammo crate
             ctx.fill(Path(CGRect(x: w * 0.318, y: h * 0.6, width: 3, height: h * 0.11)), with: .color(col(0.1, 0.1, 0.09)))
             var shade = Path()
@@ -285,9 +275,6 @@ struct HideoutBackdrop: View {
             ctx.fill(Path(crate2), with: .color(col(0.16, 0.19, 0.12)))
             ctx.stroke(Path(crate2), with: .color(col(0.07, 0.09, 0.05)), lineWidth: 2)
             ctx.fill(Path(CGRect(x: crate2.minX, y: crate2.minY, width: crate2.width, height: 4)), with: .color(col(0.25, 0.29, 0.18)))
-            // ---- wall lantern, top right
-            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.93 - 40, y: h * 0.1 - 40, width: 80, height: 80)), with: .radialGradient(Gradient(colors: [col(1, 0.72, 0.35, 0.5), .clear]), center: CGPoint(x: w * 0.93, y: h * 0.1), startRadius: 2, endRadius: 40))
-            ctx.fill(Path(CGRect(x: w * 0.93 - 8, y: h * 0.08, width: 16, height: 22)), with: .color(col(0.95, 0.75, 0.4)))
             // ---- wet floor: reflections of the window and the lamps
             for i in 0..<14 {
                 let fx = w * (0.02 + CGFloat(i) * 0.07)
@@ -330,7 +317,7 @@ struct LobbyShell<Content: View>: View {
     }
 
     /// label, nav index understood by LobbyView
-    private let items: [(String, Int)] = [("HIDEOUT", 0), ("LOADOUT", 2), ("BARRACKS", 4), ("SHOP", 6)]
+    private let items: [(String, Int)] = [("HIDEOUT", 0), ("BARRACKS", 4), ("SHOP", 6)]
 
     private func navItem(_ it: (String, Int)) -> some View {
         let on = it.1 == active

@@ -2523,8 +2523,8 @@ struct TacticalPlay: View {
     /// big crosshair button: drag it to aim the gun any direction, tap it to aim down sights
     private var fireButton: some View {
         let on = engine.ads || engine.scoped
-        return Circle().fill(on ? TUI.accent.opacity(0.7) : Color.black.opacity(0.22)).frame(width: 84, height: 84)
-            .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1.5))
+        return Circle().fill(on ? TUI.accent.opacity(0.6) : Color.black.opacity(0.14)).frame(width: 70, height: 70)
+            .overlay(Circle().stroke(Color.white.opacity(0.26), lineWidth: 1))
             .overlay(Image(systemName: "plus").font(.system(size: 30, weight: .ultraLight)).foregroundColor(on ? .black : .white.opacity(0.8)))
             .contentShape(Circle().inset(by: -18))
             .gesture(DragGesture(minimumDistance: 0)
@@ -2545,9 +2545,9 @@ struct TacticalPlay: View {
 
     /// manual fire, sits higher than the ADS button so the thumb reaches it
     private var shootButton: some View {
-        Circle().fill(Color.black.opacity(0.28)).frame(width: 78, height: 78)
-            .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1.5))
-            .overlay(Image(systemName: "scope").font(.system(size: 26, weight: .regular)).foregroundColor(.white.opacity(0.85)))
+        Circle().fill(Color.black.opacity(0.16)).frame(width: 64, height: 64)
+            .overlay(Circle().stroke(Color.white.opacity(0.28), lineWidth: 1))
+            .overlay(Image(systemName: "scope").font(.system(size: 21, weight: .light)).foregroundColor(.white.opacity(0.7)))
             .contentShape(Circle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { _ in engine.firing = true }.onEnded { _ in engine.firing = false })
     }
@@ -2713,8 +2713,8 @@ struct TacticalPlay: View {
         SF(icon, "circle.fill").font(.system(size: d * 0.42, weight: .semibold))
             .foregroundColor(on ? .black : .white.opacity(dim ? 0.35 : 0.95))
             .frame(width: d, height: d)
-            .background(Circle().fill(on ? TUI.accent : Color.black.opacity(0.3)))
-            .overlay(Circle().stroke(on ? Color.white.opacity(0.9) : Color.white.opacity(0.4), lineWidth: 1.2))
+            .background(Circle().fill(on ? TUI.accent.opacity(0.8) : Color.black.opacity(0.18)))
+            .overlay(Circle().stroke(on ? Color.white.opacity(0.8) : Color.white.opacity(0.28), lineWidth: 1))
     }
 
     private func nadeBubble(_ icon: String, _ n: Int) -> some View {
@@ -2772,9 +2772,9 @@ struct TacticalPlay: View {
                 ZStack(alignment: .topLeading) {
                     AirbladeHud(e: e) { showScoreboard.toggle() }
                     // top-right: settings
-                    Button { e.paused = true } label: { vbtn("gearshape.fill", 34) }
+                    Button { e.paused = true } label: { vbtn("gearshape.fill", 28) }
                         .buttonStyle(TuiPress())
-                        .position(x: W - 34, y: 28)
+                        .position(x: W - 28, y: 22)
                     if e.gameMode == 6 && e.me.alive {
                         Button { e.raidBagOpen.toggle() } label: {
                             VStack(spacing: 0) {
@@ -2786,17 +2786,17 @@ struct TacticalPlay: View {
                         .buttonStyle(TuiPress()).position(x: W - 36, y: 236)
                     }
                     if e.me.alive {
-                        Button { e.toggleCover() } label: { vbtn("figure.stand", 44, on: e.me.crouch) }
+                        Button { e.toggleCover() } label: { vbtn("figure.stand", 38, on: e.me.crouch) }
                             .buttonStyle(TuiPress()).position(x: W - 36, y: H - 96)
-                        Button { e.wantJump = true } label: { vbtn("arrow.up", 44) }
+                        Button { e.wantJump = true } label: { vbtn("arrow.up", 38) }
                             .buttonStyle(TuiPress()).position(x: W - 36, y: H - 44)
-                        Button { e.wantSlash = true } label: { vbtn("line.diagonal", 52) }
+                        Button { e.wantSlash = true } label: { vbtn("line.diagonal", 44) }
                             .buttonStyle(TuiPress()).position(x: W - 96, y: H - 100)
-                        Button { e.wantDash = true } label: { vbtn("bolt.fill", 44, on: e.dashCd <= 0) }
+                        Button { e.wantDash = true } label: { vbtn("bolt.fill", 38, on: e.dashCd <= 0) }
                             .buttonStyle(TuiPress()).position(x: W - 92, y: H - 44)
-                        Button { e.wantReload = true } label: { vbtn("arrow.triangle.2.circlepath", 48) }
+                        Button { e.wantReload = true } label: { vbtn("arrow.triangle.2.circlepath", 38) }
                             .buttonStyle(TuiPress()).position(x: W - 214, y: H - 40)
-                        AirbladeWeaponBox(e: e).position(x: W - 112, y: 74)
+                        AirbladeWeaponBox(e: e).position(x: W - 92, y: 64)
                     } else {
                         Button { e.fast.toggle() } label: {
                             HStack(spacing: 6) {

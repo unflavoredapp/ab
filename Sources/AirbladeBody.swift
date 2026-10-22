@@ -48,7 +48,7 @@ enum HeroBody {
 
         // team colour patches on the shoulders
         for z: Float in [-5.6, 5.6] {
-            let p = TwRig.box(1.2, 0.7, 3.0, team, glow: true)
+            let p = TwRig.box(0.8, 0.35, 1.8, team.withAlphaComponent(0.9))
             p.position = MXVector3(0, 43.6, z)
             root.addChildNode(p)
         }

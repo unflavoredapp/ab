@@ -172,6 +172,15 @@ final class TacScene {
         }
     }
 
+    /// baked Town textures shipped in Resources (blender-scripts/town_textures.py)
+    private static var townCache: [String: UIImage] = [:]
+    private func townTex(_ name: String) -> UIImage? {
+        if let c = Self.townCache[name] { return c }
+        guard let p = Bundle.main.path(forResource: name, ofType: "png"), let im = UIImage(contentsOfFile: p) else { return nil }
+        Self.townCache[name] = im
+        return im
+    }
+
     private func tileTex(_ base: (CGFloat, CGFloat, CGFloat), _ key: String) -> UIImage {
         makeTex(key) { g, s in
             ui(base).setFill(); g.fill(CGRect(x: 0, y: 0, width: s, height: s))
@@ -358,6 +367,44 @@ final class TacScene {
         }
     }
 
+    /// iron street lamps and wooden telegraph poles at the corners of the town's street tiles
+    private func townDecor(_ fr: (CGFloat) -> MXNode) {
+        func C(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> UIColor { UIColor(red: r, green: g, blue: b, alpha: 1) }
+        let iron = mat(nil, color: C(0.08, 0.085, 0.09))
+        let glass = mat(nil, color: C(1, 0.9, 0.65), emission: C(1, 0.78, 0.42))
+        let wood = mat(nil, color: C(0.27, 0.19, 0.13))
+        var placed: [CGPoint] = []
+        var k = 0
+        for rm in TMap.floorTiles where rm.mat == 8 && rm.r.width > 120 && rm.r.height > 120 {
+            let r = rm.r.insetBy(dx: 26, dy: 26)
+            for p in [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.minX, y: r.maxY)] {
+                let foot = CGRect(x: p.x - 14, y: p.y - 14, width: 28, height: 28)
+                if TMap.baseSolid.contains(where: { $0.intersects(foot) }) { continue }
+                if placed.contains(where: { hypot($0.x - p.x, $0.y - p.y) < 260 }) { continue }
+                placed.append(p)
+                k += 1
+                let g = MXNode()
+                if k % 3 == 0 {
+                    let pole = MXNode(geometry: MXCylinder(radius: 4, height: 250)); pole.geometry?.firstMaterial = wood
+                    pole.position = MXVector3(0, 125, 0); g.addChildNode(pole)
+                    let bar = MXNode(geometry: MXBox(width: 46, height: 3, length: 3, chamferRadius: 0)); bar.geometry?.firstMaterial = wood
+                    bar.position = MXVector3(0, 232, 0); g.addChildNode(bar)
+                } else {
+                    let post = MXNode(geometry: MXCylinder(radius: 2.2, height: 118)); post.geometry?.firstMaterial = iron
+                    post.position = MXVector3(0, 59, 0); g.addChildNode(post)
+                    let foot2 = MXNode(geometry: MXCylinder(radius: 4.5, height: 8)); foot2.geometry?.firstMaterial = iron
+                    foot2.position = MXVector3(0, 4, 0); g.addChildNode(foot2)
+                    let lamp = MXNode(geometry: MXBox(width: 9, height: 13, length: 9, chamferRadius: 1)); lamp.geometry?.firstMaterial = glass
+                    lamp.position = MXVector3(0, 124, 0); lamp.castsShadow = false; g.addChildNode(lamp)
+                    let hat = MXNode(geometry: MXBox(width: 13, height: 3, length: 13, chamferRadius: 1)); hat.geometry?.firstMaterial = iron
+                    hat.position = MXVector3(0, 132, 0); g.addChildNode(hat)
+                }
+                g.position = MXVector3(Float(p.x), 0, Float(p.y))
+                fr(p.x).addChildNode(g)
+            }
+        }
+    }
+
     // MARK: materials / nodes
 
     private func mat(_ img: UIImage?, color: UIColor = .gray, sx: CGFloat = 1, sy: CGFloat = 1, emission: UIColor? = nil) -> MXMaterial {
@@ -486,7 +533,7 @@ final class TacScene {
         fill.look(at: MXVector3(0, 0, 0))
 
         let lampCols: [UIColor] = [C(0.75, 0.86, 1), C(1, 0.84, 0.58), C(1, 0.72, 0.46)]
-        for rm in TMap.rooms where rm.mat < 6 {
+        for rm in TMap.rooms where rm.mat < 6 && TMap.kind != 3 {
             let n = TMap.kind == 7 ? max(1, Int(rm.r.width / 350)) : max(1, Int(rm.r.width / 600))
             for j in 0..<n {
                 let lx = rm.r.minX + rm.r.width * (CGFloat(j) + 0.5) / CGFloat(n)
@@ -594,7 +641,7 @@ final class TacScene {
             switch rm.mat {
             case 6: img = grassTex()
             case 7: img = noiseTex(b, "dirt7", dots: 2200, grid: false)
-            case 8: img = noiseTex(b, "asph8", dots: 3000, grid: true)
+            case 8: img = (TMap.kind == 3 ? townTex("town_cobble") : nil) ?? noiseTex(b, "asph8", dots: 3000, grid: true)
             case 0: img = noiseTex(b, "sand0", dots: 2600, grid: false)
             case 4: img = woodTex(b, "wood4")
             case 3, 5: img = tileTex(b, "tile\(rm.mat)")
@@ -604,7 +651,7 @@ final class TacScene {
             case 12, 13, 16: img = tileTex(b, "tile\(rm.mat)")
             default: img = noiseTex(b, "carpet", dots: 1400, grid: false)
             }
-            let tile: CGFloat = rm.mat == 6 ? 170 : (rm.mat == 1 ? 140 : (rm.mat == 3 || rm.mat == 5 ? 112 : 128))
+            let tile: CGFloat = (TMap.kind == 3 && rm.mat == 8) ? 200 : (rm.mat == 6 ? 170 : (rm.mat == 1 ? 140 : (rm.mat == 3 || rm.mat == 5 ? 112 : 128)))
             let side = mat(nil, color: ui(b, 0.5))
             let ffl = TMap.floorOfX(rm.r.midX)
             for pc in carve(rm.r, stairHoles(ffl, upper: true)) {
@@ -613,6 +660,7 @@ final class TacScene {
                 fr(pc.midX).addChildNode(n)
             }
         }
+        if TMap.kind == 3 { townDecor(fr) }
         // rugs
         for rg in TMap.rugs {
             let c = UIColor(cgColor: UIColor(rg.1).cgColor)
@@ -702,11 +750,19 @@ final class TacScene {
             let wf = TMap.floorOfX(o.midX)
             let img = wf == 0 ? cinder : (wf == 1 ? (woodsMap ? bark : paper) : plank)
             let tile: CGFloat = wf == 1 ? 160 : 128
-            let tall = woodsMap && wf == 1 && min(o.width, o.height) > 40
+            let townWall = TMap.kind == 3 && wf == 1
+            let tall = townWall || (woodsMap && wf == 1 && min(o.width, o.height) > 40)
             let hh: CGFloat = tall ? 260 : wallH
-            let front = mat(img, sx: o.width / tile, sy: hh / tile)
-            let side = mat(img, sx: o.height / tile, sy: hh / tile)
-            let n = box(o, h: hh, mats: [front, side, front, side, capMats[wf], front])
+            var front = mat(img, sx: o.width / tile, sy: hh / tile)
+            var side = mat(img, sx: o.height / tile, sy: hh / tile)
+            var cap = capMats[wf]
+            if townWall, let fac = townTex("town_facade_\(abs(Int(o.minX / 25) &* 7 &+ Int(o.minY / 25) &* 13) % 3)") {
+                front = mat(fac, sx: max(1, (o.width / 220).rounded()), sy: 1)
+                side = mat(fac, sx: max(1, (o.height / 220).rounded()), sy: 1)
+                front.normal.intensity = 0.35; side.normal.intensity = 0.35
+                if let rf = townTex("town_roof") { cap = mat(rf, sx: o.width / 160, sy: o.height / 160) }
+            }
+            let n = box(o, h: hh, mats: [front, side, front, side, cap, front])
             if TMap.hp[k] > 0 { floorRoot[wf].addChildNode(n); breakNodes[k] = (n, floorRoot[wf]) }
             else { solidWalls[wf].addChildNode(n) }
         }
@@ -1517,8 +1573,8 @@ final class TacScene {
             camNode.camera?.vignettingPower = 1.6
             // chase camera: behind and a little above, pulled in when a wall is in the way
             let back = max(20, min(ABRules.camDist, TMap.rayDist(focus.pos, focus.aim + CGFloat.pi, ABRules.camDist + 14) - 14))
-            let side: CGFloat = 11
-            camNode.position = MXVector3(Float(ex - dxv * back - dzv * side + jx * 0.3), Float(eh + 26), Float(ez - dzv * back + dxv * side + jz * 0.3))
+            let side: CGFloat = 0
+            camNode.position = MXVector3(Float(ex - dxv * back - dzv * side + jx * 0.3), Float(eh + 40), Float(ez - dzv * back + dxv * side + jz * 0.3))
             camNode.look(at: MXVector3(Float(ex + dxv * 240), Float(eh + 6 + tan(e.pitch) * 240), Float(ez + dzv * 240)))
         } else {
             vm.root.isHidden = true

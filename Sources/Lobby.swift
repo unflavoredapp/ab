@@ -47,7 +47,7 @@ struct LobbyView: View {
                     case 3: loadingScreen(g.size)
                     case 4:
                         CSArsenal(gun: $nav.tacGun, rank: TacRank.index(TacRank.totalXP(t)), cash: game.s.ex.gems, coins: t.wins, back: { screen = 0 },
-                                  editLoadout: { fromMatch = false; screen = 6 }, editChar: { }, editCos: { seasonTab = 1; showSeason = true }, offer: { seasonTab = 2; showSeason = true })
+                                  editLoadout: { }, editChar: { }, editCos: { seasonTab = 1; showSeason = true }, offer: { seasonTab = 2; showSeason = true })
                     case 7: CSGunsmith(back: { screen = gsBack })
                     case 8: CSStash(back: { screen = 0 }, ops: { opsBack = 8; screen = 9 })
                     case 9: CSOps(back: { screen = opsBack })
@@ -55,7 +55,7 @@ struct LobbyView: View {
                     case 11: workPage(t, g.size)
                     case 12: custPage(t, g.size)
                     case 14: CamoLabView(back: { screen = 12 })
-                    case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; searchT = 0; screen = 2 })
+                    case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; startMatch() })
                     case 5: CSLeague(rating: t.rating, cash: game.s.ex.gems, coins: t.wins) { screen = 0 }
                     case 6:
                         if !fromMatch { loadoutPage(t, g.size) } else { CSLoadout(gun: $nav.tacGun, countdown: fromMatch ? cd : nil, showBattle: fromMatch, gunsmith: nil, ok: { if fromMatch { beginMatch() } else { screen = 4 } }, battle: { beginMatch() }) }
@@ -107,6 +107,12 @@ struct LobbyView: View {
         .sheet(isPresented: $showRanks) {
             TacRankSheet(t: game.s.ex.tac ?? TacData(), username: $username, onPrestige: { game.tacPrestige() }).preferredColorScheme(.dark)
         }
+    }
+
+    /// QUICK START / PLAY: no matchmaking, loading or loadout screens; straight into the Town
+    private func startMatch() {
+        TMap.load(TacLobbyMaps.fallback)
+        beginMatch()
     }
 
     private func beginMatch() {
@@ -165,7 +171,7 @@ struct LobbyView: View {
                 nav.tacMap = 3
                 if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }
                 searchT = 0
-                screen = 2
+                startMatch()
             })
         }
     }
@@ -176,7 +182,7 @@ struct LobbyView: View {
             switch i {
             case 0: screen = 0
             case 1: screen = 0
-            case 2: fromMatch = false; screen = 6
+            case 2: screen = 0
             case 3: screen = 0
             case 4: showRanks = true
             case 5: showAdmin = true
@@ -185,14 +191,14 @@ struct LobbyView: View {
             default: showStats = true
             }
         case .screen(let s):
-            if s == 2 { searchT = 0 }
+            if s == 2 || s == 3 || s == 6 { startMatch(); return }
             screen = (s == 7 || s == 11 || s == 12 || s == 13 || s == 14) ? 0 : s
         case .season(let tb): seasonTab = tb; showSeason = true
         case .avatar: break
         case .friends: showAdmin = true
         case .ranks: showRanks = true
         case .stats: showStats = true
-        case .loadout: fromMatch = false; screen = 6
+        case .loadout: break
         }
     }
 
@@ -317,7 +323,7 @@ struct LobbyView: View {
                 Text("MAP: HARBOR COMPLEX").font(.jk(11, .heavy)).foregroundColor(CS.gold).position(x: W / 2, y: H - 80)
             }
             CSButton(title: "CREATE SQUAD", w: 180, h: 40, size: 16) { showAdmin = true }.position(x: 100, y: H - 30)
-            CSButton(title: "PLAY", col: CS.orange, dark: CS.orangeDark, w: 180, h: 42, size: 26) { searchT = 0; screen = 2 }
+            CSButton(title: "PLAY", col: CS.orange, dark: CS.orangeDark, w: 180, h: 42, size: 26) { startMatch() }
                 .position(x: W - 110, y: H - 30)
         }
         .padding(.horizontal, 6)

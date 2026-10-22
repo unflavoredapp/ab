@@ -1,0 +1,2 @@
+These notes describe earlier patches and mention files that no longer exist (TacBodycam.swift, TacBodycamLobby.swift, BodycamBackdrop).
+They are now AirbladeHud.swift and TacHideout.swift (HideoutBackdrop). See README.md for the current layout.

@@ -64,6 +64,8 @@ struct BladeEmblem: View {
 struct HideoutBackdrop: View {
     /// show the hero standing in the room (lobby home and character creation)
     var hero = false
+    /// horizontal centre of the hero as a fraction of the width
+    var heroX: CGFloat = 0.53
     /// the painted room (Resources/hideout_bg.jpg, blender-scripts/hideout_paint.py); the code-drawn room is the fallback
     static let bgImage: UIImage? = Bundle.main.path(forResource: "hideout_bg", ofType: "jpg").flatMap { UIImage(contentsOfFile: $0) }
 
@@ -81,10 +83,10 @@ struct HideoutBackdrop: View {
                         Ellipse()
                             .fill(RadialGradient(colors: [Color.black.opacity(0.65), .clear], center: .center, startRadius: 2, endRadius: W * 0.1))
                             .frame(width: W * 0.2, height: H * 0.06)
-                            .position(x: W * 0.53, y: H * 0.93)
+                            .position(x: W * heroX, y: H * 0.93)
                         AirbladeHero()
                             .frame(width: W * 0.42, height: H * 0.92)
-                            .position(x: W * 0.53, y: H * 0.52)
+                            .position(x: W * heroX, y: H * 0.52)
                             .allowsHitTesting(false)
                     }
                 }

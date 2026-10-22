@@ -31,7 +31,7 @@ struct LobbyView: View {
         GeometryReader { g in
             let t = game.s.ex.tac ?? TacData()
             ZStack {
-                HideoutBackdrop(hero: !created || screen == 0)
+                HideoutBackdrop(hero: !created || screen == 0 || screen == 15, heroX: screen == 15 ? 0.43 : 0.53)
                 if !created {
                     CharacterCreateView {
                         username = TacProfile.name
@@ -56,6 +56,7 @@ struct LobbyView: View {
                     case 12: custPage(t, g.size)
                     case 14: CamoLabView(back: { screen = 12 })
                     case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; startMatch() })
+                    case 15: InventoryView(t: t, size: g.size, act: homeAct)
                     case 5: CSLeague(rating: t.rating, cash: game.s.ex.gems, coins: t.wins) { screen = 0 }
                     case 6:
                         if !fromMatch { loadoutPage(t, g.size) } else { CSLoadout(gun: $nav.tacGun, countdown: fromMatch ? cd : nil, showBattle: fromMatch, gunsmith: nil, ok: { if fromMatch { beginMatch() } else { screen = 4 } }, battle: { beginMatch() }) }

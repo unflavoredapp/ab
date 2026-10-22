@@ -139,6 +139,7 @@ struct LobbyHome: View {
                 topNav("HideOut", selected: true) { act(.nav(0)) }
                 topNav("Play") { act(.screen(1)) }
                 topNav("Shop") { act(.nav(6)) }
+                topNav("Inventory") { act(.screen(15)) }
                 topNav("Event") { act(.season(0)) }
                 Spacer(minLength: 6 * u)
                 HStack(spacing: 22 * u) {

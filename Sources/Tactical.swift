@@ -287,7 +287,7 @@ final class TPlayer {
     let id: Int
     var team: Int
     var name: String
-    let handle: String
+    var handle: String
     let emoji: String
     let isPlayer: Bool
     var pos = CGPoint.zero

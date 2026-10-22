@@ -2,7 +2,7 @@
 
 iPhone-only, landscape, third-person sword-and-gun action game in the spirit of GunZ: The Duel. SwiftUI front end over a custom Metal engine ("MX"). Offline vs bots for now. Built unsigned via XcodeGen + GitHub Actions.
 
-Started as the BattleCam bodycam shooter. The bodycam look (REC stamp, grain, lens, first-person view) is retired; some internal type names (`TBody`, `Bodycam*`) still carry the old name. Bundle id stays `city.battlecam.game` so existing signing keeps working.
+The old bodycam look is gone: no REC stamp, film grain, lens shader or first-person view. The camera is always the third-person chase camera. Only the bundle id (`city.battlecam.game`) still carries the old name, so existing signing keeps working.
 
 Controls in match: left stick moves, right side looks, FIRE shoots, slash (diagonal-line button) swings the blade, bolt button dashes, arrow jumps.
 
@@ -21,7 +21,10 @@ On failure the run summary lists the compiler errors. The full log is in the `bu
 - `Sources/`: game and engine
   - `MX*.swift`: Metal engine (loader, renderer, shaders, materials)
   - `Tactical*.swift`, `Tac*.swift`: game logic, maps, HUD, weapons, lobby
-  - `TacAnnex.swift`: ANNEX, the CQC two-floor map with continuous stairs (default)
+  - `TacCharacterCreate.swift`: the "Create a character" screen shown on first launch
+  - `TacLobbyRef.swift`: the HIDEOUT lobby page; `TacHideout.swift`: hideout backdrop, logo and the shell around the other lobby pages
+  - `AirbladeHud.swift`: match HUD, scoreboard, weapon box, match rules
+  - `TacAnnex.swift`: ANNEX, the CQC two-floor map with continuous stairs
   - `TacFX.swift`: bullet decals, dust, sparks, blood, glass
   - `TacMuzzle.swift`: muzzle flash
 - `Resources/`: gun models (`gun_*.glb`, `gunmeta.json`), Annex baked maps (`annex_f1.glb`, `annex_f2.glb`), fonts, fx
@@ -29,12 +32,12 @@ On failure the run summary lists the compiler errors. The full log is in the `bu
 
 ## Maps
 
-ANNEX (default): compact CQC house, 1000x800 lot, 10 rooms per floor, 2-3 doors on every room, one continuous staircase. BLOCK 9: large. CUSTOM: editor map. Pick one in the lobby's OPERATION card.
+TOWN (default): open-air town, bright sky, streets and enterable buildings with no roofs in the way (kind 3, `TDesert` in `TacMaps2.swift`). WAREHOUSE: container yard with a tunnel and a crane catwalk (kind 2). BLOCK 9: large. ANNEX: compact CQC house, 1000x800 lot, 10 rooms per floor, one continuous staircase. CUSTOM: editor map. Tap MAP on the lobby (or the map pills on the mode screen) to switch. The list lives in `TacLobbyMaps` (`TacLobbyRef.swift`).
 
 ## Engine notes
 
 - The Annex is modelled in Blender and baked in Cycles (albedo, light and AO, height). Materials load as baked, so the engine skips its own wall and floor lighting tricks on them.
-- Post: ACES tone mapping, bloom, adaptive exposure, lens dirt, bodycam grade.
+- Post: ACES tone mapping, bloom, adaptive exposure, lens dirt, light vignette.
 - Dynamic: 8 nearest point lights, muzzle-flash light, sun shadow map.
 - Not implemented: SSAO (needs a stored depth buffer).
 
@@ -67,10 +70,11 @@ Every operator is the Special Task Force character, a real skinned model. Preset
 ## Lobby look and Blender operators
 
 - UI face is Avenir Next Condensed (ships with iOS); numerals in HUDs are monospaced. Palette is gunmetal with one restrained orange.
-- Lobby backdrop is a desaturated night scene with film grain, scanlines, vignette and a live bodycam timestamp (`BodycamBackdrop`, `BodycamGrain`, `BodycamOSD`). Panels use viewfinder corner brackets (`.tacBrackets()`).
+- Lobby backdrop is the hideout (`HideoutBackdrop`): night skyline and bridge through steel windows, evidence board, weapon rack, ammo crate and rug. Panels are plain square rectangles; `.tacBrackets()` is now a no-op kept so old call sites compile.
+- First launch: `CharacterCreateView` asks for a nickname and gender (stored by `TacProfile.create`), then the lobby opens. Stats sheet (gear icon) has NEW CHARACTER to run it again.
 - Operator assets: `stf_rig.glb` (one 68-bone skeleton, six skinned parts: body, head, vest, helmet, NVG, lenses) and `stfpose.json` (per gun: solved arm / torso bone pose and where the gun sits in the hands). Textures are swapped at runtime from `stf_body_*`, `stf_gear_*`, `stf_helm_*`, `stf_head_*` jpgs. `TacOperator.bot(style:)` builds a live operator; `TacOperator.node(style:gun:)` a posed preview. Every use falls back to the code-built soldier if a piece is missing.
 - `op_<kit>.png` are the card portraits; `stfsw_*.png` are the swatches in Customize.
-- In-game HUD uses the same language: square gunmetal panels (`tuiGlass`), corner brackets, condensed type, monospaced numerals, no capsules.
+- In-game HUD (`AirbladeHud`): level badge with white HP and blue 3-segment AP bars top-left, timer with kill-target boxes top-centre (tap for the scoreboard), plain-text kill feed top-right, weapon box (ammo or the infinity mark for the blade) bottom-centre.
 - Rebuild: `blender-scripts/stf_rig.py` (needs `stf_lib.py`, `stf_pose.py`, `stf_export.py` beside it) writes `stf_rig.glb` + `stfpose.json`; `stf_rigcheck2.py` checks the runtime pose maths against the Blender solver. Python 3 with bpy.
 
 ## Credits
@@ -82,7 +86,7 @@ Every operator is the Special Task Force character, a real skinned model. Preset
 The build workflow only builds. It no longer prunes or commits anything to the repository.
 
 ## AIRBLADE (in progress)
-Milestone 1: third-person combat test. `TBody.tps` (TacBodycam.swift) switches the chase camera on: the operator model is visible, ceilings are hidden, the bodycam lens is off and a reticle is drawn. DASH button (bolt) bursts along the move direction. Set `TBody.tps = false` to get the old first-person bodycam back.
+Third-person combat: the chase camera (`ABRules.camDist`, `ABRules.camFov`) is the only camera. The operator model is visible, ceilings are hidden, open maps get a longer view distance and a reticle is drawn. DASH button (bolt) bursts along the move direction.
 
 ## Movement and duel (AIRBLADE)
 - Real jump height (`pz`) in `TacticalEngine`: jump button, gravity, wall-run (airborne, moving along or into a wall, up to ~1.1 s) and wall-jump (jump within 0.25 s of wall contact; kicks off the wall). Height is visual and for the camera only; collision stays 2D.

@@ -88,7 +88,7 @@ enum TMap {
 
     static func site(_ i: Int) -> CGRect { i == 0 ? siteA : siteB }
     static var siteNames: [String] { cur.siteNames }
-    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE YARD", "DESERT OUTPOST", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
+    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
 
     static func roomName(_ p: CGPoint) -> String {
         for r in rooms where r.r.contains(p) { return r.name }

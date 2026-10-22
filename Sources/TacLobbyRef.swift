@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Maps the lobby offers, open-air ones first (town, warehouse yard), then the indoor ones.
 enum TacLobbyMaps {
-    static let ids = [3, 2, 6, 7, 5]
+    static let ids = [3]
     static let fallback = 3
 
     private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
@@ -72,7 +72,6 @@ struct LobbyHome: View {
                 topNav("HideOut", selected: true) { act(.nav(0)) }
                 topNav("Play") { act(.screen(1)) }
                 topNav("Shop") { act(.nav(6)) }
-                topNav("Inventory") { act(.loadout) }
                 topNav("Event") { act(.season(0)) }
             }
             Spacer(minLength: 8)
@@ -116,7 +115,7 @@ struct LobbyHome: View {
                 .fill(RadialGradient(colors: [Color.black.opacity(0.55), .clear], center: .center, startRadius: 2, endRadius: size.width * 0.15))
                 .frame(width: size.width * 0.3, height: size.height * 0.09)
                 .position(x: size.width * 0.53, y: size.height * 0.9)
-            AvatarSoldierPreview(style: TacAvatar.style(TacAvatar.myKey), rank: TacRank.index(TacRank.totalXP(t)), gun: nav.tacGun)
+            AirbladeHero()
                 .frame(width: size.width * 0.36, height: size.height * 0.9)
                 .position(x: size.width * 0.53, y: size.height * 0.53)
                 .allowsHitTesting(false)

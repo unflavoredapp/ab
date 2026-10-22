@@ -225,7 +225,7 @@ struct LobbyShell<Content: View>: View {
     }
 
     /// label, nav index understood by LobbyView
-    private let items: [(String, Int)] = [("HIDEOUT", 0), ("LOADOUT", 2), ("ARMORY", 3), ("EDITOR", 8), ("OPERATORS", 1), ("BARRACKS", 4), ("SHOP", 6)]
+    private let items: [(String, Int)] = [("HIDEOUT", 0), ("LOADOUT", 2), ("BARRACKS", 4), ("SHOP", 6)]
 
     private func navItem(_ it: (String, Int)) -> some View {
         let on = it.1 == active

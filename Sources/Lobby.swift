@@ -47,7 +47,7 @@ struct LobbyView: View {
                     case 3: loadingScreen(g.size)
                     case 4:
                         CSArsenal(gun: $nav.tacGun, rank: TacRank.index(TacRank.totalXP(t)), cash: game.s.ex.gems, coins: t.wins, back: { screen = 0 },
-                                  editLoadout: { fromMatch = false; screen = 6 }, editChar: { showAvatar = true }, editCos: { seasonTab = 1; showSeason = true }, offer: { seasonTab = 2; showSeason = true })
+                                  editLoadout: { fromMatch = false; screen = 6 }, editChar: { }, editCos: { seasonTab = 1; showSeason = true }, offer: { seasonTab = 2; showSeason = true })
                     case 7: CSGunsmith(back: { screen = gsBack })
                     case 8: CSStash(back: { screen = 0 }, ops: { opsBack = 8; screen = 9 })
                     case 9: CSOps(back: { screen = opsBack })
@@ -55,10 +55,10 @@ struct LobbyView: View {
                     case 11: workPage(t, g.size)
                     case 12: custPage(t, g.size)
                     case 14: CamoLabView(back: { screen = 12 })
-                    case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 5; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; searchT = 0; screen = 2 })
+                    case 13: MapEditorView(back: { screen = 0 }, deploy: { nav.tacMap = 3; if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }; searchT = 0; screen = 2 })
                     case 5: CSLeague(rating: t.rating, cash: game.s.ex.gems, coins: t.wins) { screen = 0 }
                     case 6:
-                        if !fromMatch { loadoutPage(t, g.size) } else { CSLoadout(gun: $nav.tacGun, countdown: fromMatch ? cd : nil, showBattle: fromMatch, gunsmith: fromMatch ? nil : { gsBack = 6; screen = 7 }, ok: { if fromMatch { beginMatch() } else { screen = 4 } }, battle: { beginMatch() }) }
+                        if !fromMatch { loadoutPage(t, g.size) } else { CSLoadout(gun: $nav.tacGun, countdown: fromMatch ? cd : nil, showBattle: fromMatch, gunsmith: nil, ok: { if fromMatch { beginMatch() } else { screen = 4 } }, battle: { beginMatch() }) }
                     default: homeScreen(t, g.size)
                     }
                 }
@@ -162,7 +162,7 @@ struct LobbyView: View {
     private func workPage(_ t: TacData, _ size: CGSize) -> some View {
         LobbyShell(active: 3, size: size, t: t, act: { homeAct($0) }) {
             CSWorkshop(t: t, size: LS.area(size), act: { homeAct($0) }, playMap: {
-                nav.tacMap = 5
+                nav.tacMap = 3
                 if nav.tacMode == 6 || nav.tacMode == 7 { nav.tacMode = 1 }
                 searchT = 0
                 screen = 2
@@ -175,21 +175,20 @@ struct LobbyView: View {
         case .nav(let i):
             switch i {
             case 0: screen = 0
-            case 1: screen = 12
+            case 1: screen = 0
             case 2: fromMatch = false; screen = 6
-            case 3: gsBack = 0; screen = 7
+            case 3: screen = 0
             case 4: showRanks = true
             case 5: showAdmin = true
             case 6: seasonTab = 2; showSeason = true
-            case 8: screen = 13
+            case 8: screen = 0
             default: showStats = true
             }
         case .screen(let s):
             if s == 2 { searchT = 0 }
-            if s == 7 { gsBack = 0 }
-            screen = s
+            screen = (s == 7 || s == 11 || s == 12 || s == 13 || s == 14) ? 0 : s
         case .season(let tb): seasonTab = tb; showSeason = true
-        case .avatar: showAvatar = true
+        case .avatar: break
         case .friends: showAdmin = true
         case .ranks: showRanks = true
         case .stats: showStats = true
@@ -357,7 +356,7 @@ struct LobbyView: View {
         let ri = TacRank.index(TacRank.totalXP(t))
         let mc = CS.modeCols[nav.tacMode]
         return ZStack {
-            AvatarSoldierPreview(style: TacAvatar.style(TacAvatar.myKey), rank: ri, gun: nav.tacGun)
+            AirbladeHero()
                 .frame(width: W * 0.4, height: H * 0.92).position(x: W * 0.5, y: H * 0.58).allowsHitTesting(false)
             LinearGradient(colors: [Color.black.opacity(0.55), .clear, Color.black.opacity(0.6)], startPoint: .top, endPoint: .bottom).allowsHitTesting(false)
             // search status
@@ -425,7 +424,7 @@ struct LobbyView: View {
         let woods = nav.tacMode == 6
         let m = nav.tacMode
         let tips = ["Pistols are very useful weapons that can save you from a lot of trouble.", "Walls and props can be shot apart. Break cover to flush enemies out.", "Doors can be closed to slow pushes and hide sound.", "Loot the yard, finish your contract and reach an extraction zone alive. Die and you lose the bag."]
-        let mapTitle = (woods || m == 7) ? TacLobbyMaps.title(4) : TacLobbyMaps.title(nav.tacMap)
+        let mapTitle = TacLobbyMaps.title(3)
         return ZStack {
             VStack(spacing: 8) {
                 HStack(spacing: 10) {

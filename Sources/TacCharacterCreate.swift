@@ -50,7 +50,7 @@ struct CharacterCreateView: View {
     private func actionButton(_ title: String, fill: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title).font(.jk(13, .heavy)).foregroundColor(.white)
-                .frame(maxWidth: .infinity).frame(height: 32)
+                .frame(maxWidth: .infinity).frame(height: 26)
                 .background(fill)
                 .overlay(Rectangle().stroke(Color.white.opacity(0.28), lineWidth: 1))
         }
@@ -60,11 +60,11 @@ struct CharacterCreateView: View {
     private var dialog: some View {
         VStack(spacing: 0) {
             Text("Create a character").font(.jk(14, .heavy)).foregroundColor(.white)
-                .frame(maxWidth: .infinity).frame(height: 30)
+                .frame(maxWidth: .infinity).frame(height: 24)
                 .background(Color.white.opacity(0.08))
-            VStack(spacing: 8) {
-                HStack(spacing: 10) {
-                    Text("Nick name").font(.jk(12, .semibold)).foregroundColor(.white.opacity(0.85)).frame(width: 66, alignment: .leading)
+            VStack(spacing: 5) {
+                HStack(spacing: 8) {
+                    Text("Nick name").font(.jk(12, .semibold)).foregroundColor(.white.opacity(0.85)).frame(width: 58, alignment: .leading)
                     TextField("", text: $nick, prompt: Text("Enter nickname").foregroundColor(.white.opacity(0.35)))
                         .font(.jk(13, .semibold)).foregroundColor(.white)
                         .multilineTextAlignment(.center)
@@ -73,31 +73,31 @@ struct CharacterCreateView: View {
                         .submitLabel(.done)
                         .focused($focused)
                         .onSubmit { focused = false }
-                        .frame(height: 28)
+                        .frame(height: 24)
                         .background(Color.black.opacity(0.5))
                         .overlay(Rectangle().stroke(focused ? blue : Color.white.opacity(0.25), lineWidth: 1))
                 }
                 HStack(spacing: 10) {
-                    Text("Gender").font(.jk(12, .semibold)).foregroundColor(.white.opacity(0.85)).frame(width: 66, alignment: .leading)
+                    Text("Gender").font(.jk(12, .semibold)).foregroundColor(.white.opacity(0.85)).frame(width: 58, alignment: .leading)
                     HStack(spacing: 0) {
                         arrow("chevron.left")
                         Text(TacProfile.genderNames[gender]).font(.jk(13, .semibold)).foregroundColor(.white).frame(maxWidth: .infinity)
                         arrow("chevron.right")
                     }
-                    .frame(height: 28)
+                    .frame(height: 24)
                     .background(Color.white.opacity(0.1))
                     .overlay(Rectangle().stroke(Color.white.opacity(0.25), lineWidth: 1))
                 }
                 Text(warn).font(.jk(10, .medium)).foregroundColor(TUI.red).lineLimit(1).minimumScaleFactor(0.7)
-                    .frame(height: 12)
-                HStack(spacing: 10) {
+                    .frame(height: 10)
+                HStack(spacing: 8) {
                     actionButton("OK", fill: blue, action: submit)
                     actionButton("Cancel", fill: Color.white.opacity(0.12), action: cancel)
                 }
             }
-            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 12)
+            .padding(.horizontal, 10).padding(.top, 7).padding(.bottom, 9)
         }
-        .frame(width: 310)
+        .frame(width: 250)
         .background(Color(red: 0.07, green: 0.075, blue: 0.085).opacity(0.94))
         .overlay(Rectangle().stroke(Color.white.opacity(0.22), lineWidth: 1))
         .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
@@ -108,9 +108,9 @@ struct CharacterCreateView: View {
             let W = g.size.width, H = g.size.height
             ZStack {
                 HideoutBackdrop()
-                AvatarSoldierPreview(style: TacAvatar.style(TacAvatar.myKey, look), rank: 0, gun: "smg")
-                    .frame(width: W * 0.34, height: H * 0.9)
-                    .position(x: W * 0.5, y: H * 0.5)
+                AirbladeHero()
+                    .frame(width: W * 0.34, height: H * 1.0)
+                    .position(x: W * 0.5, y: H * 0.46)
                     .allowsHitTesting(false)
                 HStack(spacing: 10) {
                     AirbladeLogo(size: 17)
@@ -122,7 +122,7 @@ struct CharacterCreateView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 12).padding(.top, 10)
                 dialog
-                    .position(x: W / 2, y: focused ? H * 0.34 : H - 112)
+                    .position(x: W / 2, y: focused ? H * 0.34 : H - 76)
                     .animation(.easeOut(duration: 0.2), value: focused)
             }
             .frame(width: W, height: H)

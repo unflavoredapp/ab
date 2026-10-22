@@ -204,60 +204,96 @@ enum TWarehouse {
     }
 }
 
-// MARK: - Town Outpost (kind 3): 0 cellar, 1 village, 2 rooftop
+// MARK: - Town (kind 3): the one AIRBLADE map. Streets and blocks traced from the top-down town plan.
+// Everything is authored in the plan's own 1024px coordinates and mapped onto the 3000x1800 floor.
 
 enum TDesert {
     static let shared: MapData = build()
 
+    // plan -> world (snapped to the 25-unit grid so walls line up)
+    private static func X(_ v: CGFloat) -> CGFloat { snap(75 + (v - 10) * 2.836) }
+    private static func Y(_ v: CGFloat) -> CGFloat { snap(75 + (v - 80) * 1.784) }
+    private static func snap(_ v: CGFloat) -> CGFloat { (v / 25).rounded() * 25 }
+    private static func B(_ x0: CGFloat, _ y0: CGFloat, _ x1: CGFloat, _ y1: CGFloat) -> CGRect {
+        CGRect(x: X(x0), y: Y(y0), width: X(x1) - X(x0), height: Y(y1) - Y(y0))
+    }
+    private static func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: X(x) + 3200, y: Y(y)) }
+
     private static func build() -> MapData {
         let b = MapBuilder()
-        let rc = b.rc
-        b.area(0, "Cellar", rc(1250, 1250, 600, 300), 1)
-        b.area(2, "Rooftop", rc(1150, 175, 500, 300), 5)
-        let arena = rc(150, 100, 2700, 1600)
-        b.setR(1, arena, true)
-        b.tiles.insert(TRoom(name: "Streets", r: MapBuilder.R(1, arena), mat: 8, fl: 1), at: 0)
-        b.rooms.append(TRoom(name: "Main Street", r: MapBuilder.R(1, rc(150, 100, 2700, 800)), mat: 0, fl: 1))
-        b.rooms.append(TRoom(name: "Old Square", r: MapBuilder.R(1, rc(150, 900, 2700, 800)), mat: 0, fl: 1))
-        b.building(1, "Market", rc(300, 200, 500, 400), doors: [("S", 200)], mat: 3)
-        b.building(1, "Hall", rc(1100, 150, 600, 350), doors: [("S", 250), ("W", 120)], mat: 5)
-        b.building(1, "Villa", rc(2000, 200, 550, 450), doors: [("W", 150)], mat: 3)
-        b.building(1, "Workshop", rc(250, 1150, 450, 400), doors: [("N", 150)], mat: 5)
-        b.building(1, "Barracks", rc(1200, 1200, 700, 400), doors: [("N", 200), ("E", 150)], mat: 3)
-        b.building(1, "Tower House", rc(2250, 1100, 500, 500), doors: [("W", 200)], mat: 5)
+        let st = 8   // street material
+        // streets (walkable)
+        let streets: [CGRect] = [
+            B(10, 80, 120, 270),      // north-west lot
+            B(40, 165, 640, 270),     // north street
+            B(300, 100, 490, 165),    // north alcove
+            B(640, 100, 850, 300),    // north-east plaza
+            B(440, 270, 880, 370),    // middle street
+            B(820, 370, 880, 600),    // east link
+            B(880, 240, 1015, 1000),  // east avenue
+            B(10, 270, 120, 500),     // west street
+            B(10, 490, 190, 690),     // south-west lot
+            B(120, 595, 700, 665),    // south street
+            B(700, 600, 880, 670),    // south-east street
+            B(505, 600, 560, 930),    // centre lane
+            B(460, 820, 910, 930),    // bottom street
+            B(440, 370, 625, 490),    // inner lane
+        ]
+        for r in streets { b.gap(1, r, st) }
+        b.rooms.append(TRoom(name: "North Street", r: MapBuilder.R(1, B(40, 165, 640, 270)), mat: 0, fl: 1))
+        b.rooms.append(TRoom(name: "Plaza", r: MapBuilder.R(1, B(640, 100, 850, 300)), mat: 0, fl: 1))
+        b.rooms.append(TRoom(name: "East Avenue", r: MapBuilder.R(1, B(880, 240, 1015, 1000)), mat: 0, fl: 1))
+        b.rooms.append(TRoom(name: "South Street", r: MapBuilder.R(1, B(120, 595, 700, 665)), mat: 0, fl: 1))
+        b.rooms.append(TRoom(name: "West Street", r: MapBuilder.R(1, B(10, 270, 120, 500)), mat: 0, fl: 1))
 
-        let stairs: [CGRect] = [rc(1300, 1350, 100, 120), rc(1175, 200, 100, 150)]
-        let stairLo: [Int] = [0, 1]
+        // enterable buildings
+        let A = B(120, 270, 290, 590), Bb = B(290, 270, 440, 600), D = B(625, 370, 820, 490)
+        let E = B(385, 490, 665, 595), F = B(695, 490, 820, 600), G = B(545, 670, 890, 880)
+        b.building(1, "Row Houses", A, doors: [("W", 120), ("S", 50)], mat: 3)
+        b.building(1, "Bakery", Bb, doors: [("N", 20), ("S", 20)], mat: 5)
+        b.building(1, "Cafe", D, doors: [("N", 60), ("W", Y(445) - D.minY), ("E", 30)], mat: 3)
+        b.building(1, "Archive", E, doors: [("N", X(480) - E.minX), ("S", 150)], mat: 5)
+        b.building(1, "Clinic", F, doors: [("S", 10), ("E", 80)], mat: 3)
+        b.building(1, "Town Hall", G, doors: [("N", X(740) - G.minX), ("S", 200)], mat: 5)
+
         let layout = b.layout([.concrete, .brick, .concrete])
+        let rc = b.rc
+        func prop(_ k: PropKind, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) { b.p(1, k, X(x), Y(y), w, h) }
 
+        // street cover
+        prop(.car, 45, 140, 56, 110); prop(.crate, 90, 205, 70, 70); prop(.barrel, 210, 195, 36, 36)
+        prop(.sandbag, 330, 215, 140, 32); prop(.crate, 470, 195, 80, 70); prop(.barrel, 560, 230, 36, 36)
+        prop(.crate, 330, 130, 80, 60); prop(.car, 560, 205, 110, 56)
+        prop(.crate, 690, 140, 70, 70); prop(.sandbag, 830, 150, 32, 110); prop(.barrel, 700, 280, 36, 36)
+        prop(.sandbag, 770, 300, 120, 32); prop(.crate, 560, 325, 90, 70)
+        prop(.barrel, 940, 290, 36, 36); prop(.sandbag, 940, 420, 32, 120); prop(.car, 960, 560, 56, 110)
+        prop(.crate, 920, 700, 90, 80); prop(.barrel, 985, 850, 36, 36); prop(.sandbag, 930, 940, 130, 32)
+        prop(.crate, 780, 880, 90, 70); prop(.car, 640, 880, 110, 56); prop(.crate, 520, 760, 70, 70)
+        prop(.barrel, 530, 640, 36, 36); prop(.sandbag, 330, 620, 130, 32); prop(.crate, 210, 630, 80, 60)
+        prop(.barrel, 60, 600, 36, 36); prop(.crate, 80, 420, 70, 70); prop(.sandbag, 60, 330, 32, 100)
+        prop(.crate, 760, 620, 80, 60); prop(.car, 470, 420, 56, 100)
         // interiors
-        b.p(1, .counter, 350, 250, 300, 36); b.p(1, .crate, 650, 480, 60, 60); b.p(1, .barrel, 340, 520, 36, 36)
-        b.p(1, .table, 1350, 320, 180, 70); b.p(1, .couch, 1500, 200, 160, 60); b.p(1, .crate, 1180, 420, 50, 50)
-        b.p(1, .couch, 2100, 230, 200, 70); b.p(1, .table, 2300, 400, 140, 70); b.p(1, .shelf, 2450, 230, 28, 150)
-        b.p(1, .crate, 300, 1260, 60, 60); b.p(1, .shelf, 330, 1480, 300, 28); b.p(1, .barrel, 600, 1400, 36, 36)
-        b.p(1, .crate, 1250, 1260, 60, 60); b.p(1, .crate, 1700, 1500, 100, 60); b.p(1, .table, 1450, 1400, 200, 70); b.p(1, .barrel, 1800, 1260, 36, 36)
-        b.p(1, .table, 2350, 1250, 120, 70); b.p(1, .crate, 2600, 1480, 60, 60); b.p(1, .couch, 2300, 1480, 160, 60)
-        // outdoor cover
-        b.p(1, .sandbag, 900, 700, 120, 32); b.p(1, .sandbag, 1000, 740, 32, 100); b.p(1, .crate, 1300, 700, 70, 70); b.p(1, .barrel, 1700, 650, 36, 36)
-        b.p(1, .car, 820, 1000, 110, 56); b.p(1, .crate, 500, 800, 90, 70); b.p(1, .crate, 2100, 850, 100, 80)
-        b.p(1, .sandbag, 1500, 900, 150, 32); b.p(1, .crate, 1450, 1050, 90, 90); b.p(1, .crate, 1000, 1000, 80, 60)
-        b.p(1, .car, 2000, 1000, 56, 110); b.p(1, .sandbag, 2350, 800, 120, 32); b.p(1, .crate, 900, 1550, 110, 80)
-        b.p(1, .crate, 780, 700, 60, 60); b.p(1, .barrel, 2700, 820, 36, 36); b.p(1, .crate, 2600, 950, 90, 90)
-        b.p(1, .sandbag, 2100, 700, 32, 120); b.p(1, .crate, 700, 900, 70, 70)
-        b.p(0, .crate, 1500, 1280, 60, 60); b.p(0, .barrel, 1700, 1500, 36, 36)
-        b.p(2, .crate, 1400, 250, 60, 60); b.p(2, .sandbag, 1500, 400, 100, 30)
+        prop(.counter, 150, 300, 130, 36); prop(.table, 210, 480, 120, 60)
+        prop(.shelf, 305, 300, 28, 110); prop(.table, 340, 460, 100, 60)
+        prop(.counter, 660, 395, 120, 36); prop(.table, 700, 440, 100, 60)
+        prop(.shelf, 400, 515, 150, 28); prop(.crate, 600, 545, 60, 50); prop(.table, 480, 545, 140, 60)
+        prop(.couch, 710, 520, 100, 50); prop(.table, 760, 560, 60, 40)
+        prop(.couch, 600, 700, 160, 60); prop(.table, 760, 740, 160, 70); prop(.shelf, 860, 690, 28, 120); prop(.crate, 620, 810, 70, 60)
 
-        let keep: [CGRect] = b.outers.map { $0.insetBy(dx: -70, dy: -70) } + b.props.filter { TMap.floorOfX($0.r.midX) == 1 }.map { $0.r.insetBy(dx: -30, dy: -30) } + stairs.map { $0.insetBy(dx: -60, dy: -60) }
-        let ring = b.ring(keep, seed: 91)
-        let spawns = ring.map { CGPoint(x: $0.x + 3200, y: $0.y) }
-        let atk = (0..<5).map { CGPoint(x: 230 + 3200, y: 700 + CGFloat($0) * 90) }
-        let def = (0..<5).map { CGPoint(x: 2780 + 3200, y: 700 + CGFloat($0) * 90) }
-        let packs = [CGPoint(x: 1500, y: 800), CGPoint(x: 900, y: 900), CGPoint(x: 2200, y: 900), CGPoint(x: 1500, y: 1650)].map { CGPoint(x: $0.x + 3200, y: $0.y) }
-        var md = MapData(rooms: b.rooms, floorTiles: b.tiles, layout: layout, props: b.props, packPos: packs, stairs: stairs, stairLo: stairLo,
-                         siteA: MapBuilder.R(1, rc(400, 300, 300, 200)), siteB: MapBuilder.R(1, rc(2400, 1250, 300, 250)),
-                         atkSpawn: atk, defSpawn: def, hubZone: MapBuilder.R(1, rc(1300, 700, 400, 200)),
-                         floorNames: ["CELLAR", "TOWN", "ROOFTOP"], loot: [], roofs: b.roofs, spawns: spawns)
-        md.siteNames = ["A · MARKET", "B · TOWER HOUSE"]
+        let keep: [CGRect] = b.outers.map { $0.insetBy(dx: -40, dy: -40) }
+        _ = keep
+        let spawnPts: [CGPoint] = [P(70, 130), P(70, 240), P(200, 220), P(380, 215), P(540, 215), P(700, 180), P(780, 270), P(560, 330),
+                                   P(680, 330), P(940, 300), P(950, 480), P(950, 640), P(950, 800), P(950, 960), P(800, 900), P(640, 900),
+                                   P(530, 780), P(400, 630), P(250, 630), P(70, 560)]
+        let atk = (0..<5).map { P(40 + CGFloat($0) * 14, 110 + CGFloat($0) * 36) }
+        let def = (0..<5).map { P(930 + CGFloat($0) * 14, 900 + CGFloat($0) * 20) }
+        let packs = [P(550, 215), P(700, 330), P(950, 600), P(520, 800), P(300, 630)]
+        var md = MapData(rooms: b.rooms, floorTiles: b.tiles, layout: layout, props: b.props, packPos: packs, stairs: [], stairLo: [],
+                         siteA: B(640, 100, 850, 300).offsetBy(dx: 3200, dy: 0), siteB: B(880, 780, 1015, 1000).offsetBy(dx: 3200, dy: 0),
+                         atkSpawn: atk, defSpawn: def, hubZone: B(440, 270, 880, 370).offsetBy(dx: 3200, dy: 0),
+                         floorNames: ["CELLAR", "TOWN", "ROOFTOP"], loot: [], roofs: b.roofs, spawns: spawnPts)
+        md.siteNames = ["A · PLAZA", "B · EAST AVENUE"]
+        _ = rc
         return md
     }
 }

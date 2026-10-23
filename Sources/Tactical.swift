@@ -321,6 +321,7 @@ final class TPlayer {
     /// Free Roam: pedestrian (never fights), crew id (0 none), tier (0 regular, 1 bruiser, 2 boss), hit stun
     var civ = false
     var ally = false
+    var inCar = false
     var crew = 0
     var tier = 0
     var stun: CGFloat = 0
@@ -691,7 +692,7 @@ final class TacticalEngine {
         TMap.load(mode == 10 ? 10 : (mode == 8 || mode == 9 ? 9 : 3))   // Duel and the Movement Lab use the vertical arena, everything else the Town
         tags = []
         myGun = gun
-        let nb = mode == 10 ? 30 : mode == 9 ? 7 : (mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9)))
+        let nb = mode == 10 ? 33 : mode == 9 ? 7 : (mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9)))
         var names: [(String, String, String)] = TacRoster.pick(nb)
         while names.count < nb { let k = names.count + 1; names.append(("Recruit \(k)", "recruit\(k)", "")) }
         players = [TPlayer(id: 0, team: 0, name: TacProfile.name, handle: "you", emoji: "", isPlayer: true)]
@@ -1527,7 +1528,7 @@ final class TacticalEngine {
     }
 
     func damage(_ victim: TPlayer, _ amt: CGFloat, by owner: Int) {
-        guard victim.alive else { return }
+        guard victim.alive, !victim.inCar else { return }
         var amt = owner > -2 ? amt * ABRules.dmgMul : amt
         if victim.armor > 0 && owner > -2 {
             let ratio: CGFloat = victim.armorKind >= 3 ? 0.75 : (victim.armorKind == 2 ? 0.6 : 0.5)
@@ -3324,16 +3325,16 @@ extension TacticalEngine {
         roam.homes = homes
         for p in players where !p.isPlayer {
             let i = p.id - 1
-            if i >= 15 && i < 18 && RoamPrefs.crewOn {
+            if i >= 30 && RoamPrefs.crewOn {
                 // your crew: follow, fight rivals, regroup
                 p.civ = false; p.ally = true; p.team = 0; p.crew = 3; p.tier = 0
-                p.name = ["Rico", "Dee", "Nia"][i - 15]
+                p.name = ["Rico", "Dee", "Nia"][i - 30]
                 p.handle = p.name.lowercased()
                 p.arm = 1; p.mag = 99
                 p.home = roam.hideout
-            } else if i < 18 {
+            } else if i < 18 || i >= 30 {
                 p.civ = true; p.team = 1; p.crew = 0
-                p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana", "Devon", "Mia", "Terrell", "Sasha", "Andre", "Lena", "Cruz", "Imani"][i]
+                p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana", "Devon", "Mia", "Terrell", "Sasha", "Andre", "Lena", "Cruz", "Imani"][i % 18]
                 p.handle = p.name.lowercased()
             } else {
                 p.civ = false; p.team = 1
@@ -3361,6 +3362,21 @@ extension TacticalEngine {
             }
             roam.job = roamPendingJob(pd, spawn: spawn)
         }
+        roamSpawnMyCar()
+    }
+
+    /// your own ride from the ready-up screen: kind and colour, parked next to where you start
+    func roamSpawnMyCar() {
+        let ud = UserDefaults.standard
+        let spawn = roam.startPos ?? roam.hideout
+        var cp = CGPoint(x: spawn.x + 95, y: spawn.y + 35)
+        TMap.push(&cp, 36)
+        let car = RoamCar(pos: cp, heading: 0, color: ud.integer(forKey: "ab.loadout.carColor"))
+        car.kind = min(2, max(0, ud.integer(forKey: "ab.loadout.carKind")))
+        car.maxHP = [120, 90, 220][car.kind]
+        car.hp = car.maxHP
+        car.mine = true
+        roam.cars.append(car)
     }
 
     private func roamPendingJob(_ pd: OWWorld.Pending, spawn: CGPoint) -> RoamJob {
@@ -3509,17 +3525,23 @@ extension TacticalEngine {
         if let w = roam.waypoint, tDist(w, me.pos) < 80 { roam.waypoint = nil }
         for car in roam.cars where car.wrecked {
             car.wreckT -= dt
-            if car.wreckT <= 0 { car.pos = car.home; car.heading = car.homeHeading; car.speed = 0; car.hp = 120 }
+            if car.wreckT <= 0 { car.pos = car.home; car.heading = car.homeHeading; car.speed = 0; car.hp = car.maxHP }
         }
         jobTick(dt)
     }
 
     /// crew AI upkeep: catch up when left behind, jump to you when far away
     private func allyTick(_ p: TPlayer, _ dt: CGFloat) {
-        guard me.alive, roam.driving < 0 else {
-            // you are in a car: they hang back near where you were
+        if roam.driving >= 0 && me.alive {
+            // ride along: hop in with you
+            let c = roam.cars[roam.driving]
+            p.inCar = true
+            p.pos = c.pos
+            p.targetID = -1; p.hunt = 0; p.path = []
+            p.stun = max(p.stun, 0.25)
             return
         }
+        if p.inCar { p.inCar = false; p.stun = 0 }
         let d = tDist(p.pos, me.pos)
         if p.targetID < 0 && d > 1500 { roamPlace(p) }
         else if p.targetID >= 0 && d > 900 { p.targetID = -1; p.hunt = 0 }
@@ -3528,6 +3550,7 @@ extension TacticalEngine {
     /// crew status for the strip
     func allyStatus(_ p: TPlayer) -> String {
         if !p.alive { return "DOWN" }
+        if p.inCar { return "IN CAR" }
         if p.targetID >= 0 { return "FIGHTING" }
         if tDist(p.pos, me.pos) > 450 { return "REGROUPING" }
         return "FOLLOWING"
@@ -3899,6 +3922,12 @@ extension TacticalEngine {
             roam.driving = -1
             var out = CGPoint(x: c.pos.x - sin(c.heading) * 62, y: c.pos.y + cos(c.heading) * 62)
             TMap.push(&out, 16)
+            for a in players where a.ally && a.inCar {
+                a.inCar = false; a.stun = 0
+                var q = CGPoint(x: c.pos.x + cos(c.heading + CGFloat(a.id) * 2.1) * 70, y: c.pos.y + sin(c.heading + CGFloat(a.id) * 2.1) * 70)
+                TMap.push(&q, 16)
+                a.pos = q
+            }
             me.pos = out
             me.aim = c.heading
             c.speed = 0
@@ -3917,9 +3946,10 @@ extension TacticalEngine {
         let p = me
         wantJump = false; wantDash = false; wantReload = false; wantSwap = false; wantSlash = false; lookDelta = 0
         let throttle = max(-1, min(1, -move.dy)), steer = max(-1, min(1, move.dx))
-        let maxFwd: CGFloat = 820, maxRev: CGFloat = 260
+        let maxFwd: CGFloat = [820, 980, 700][min(2, c.kind)], maxRev: CGFloat = 260
+        let accel: CGFloat = [1, 1.2, 0.8][min(2, c.kind)]
         if throttle > 0.05 {
-            c.speed += (c.speed < 0 ? 700 : 440) * throttle * dt
+            c.speed += (c.speed < 0 ? 700 : 440) * accel * throttle * dt
         } else if throttle < -0.05 {
             c.speed += (c.speed > 0 ? -640 : -260) * -throttle * dt
         } else {

@@ -375,6 +375,8 @@ struct HideoutStage: UIViewRepresentable {
             let yaw = 0.18 * sin(tt * 0.45)
             co.heroRoot?.eulerAngles = MXVector3(0, yaw, 0)
             co.cloth?.update(t: tt, run: 0, yawVel: 0.18 * 0.45 * cos(tt * 0.45))
+            camN.position = MXVector3(-0.15 + 0.45 * sin(tt * 0.11), 1.05 + 0.07 * sin(tt * 0.17), 4.6 + 0.35 * sin(tt * 0.08))
+            camN.look(at: MXVector3(-0.15 + 0.1 * sin(tt * 0.11), 1.0, 0))
         }
         return v
     }

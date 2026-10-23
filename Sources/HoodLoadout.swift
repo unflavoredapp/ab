@@ -104,6 +104,31 @@ struct OWLoadoutView: View {
     @State private var weapon = UserDefaults.standard.integer(forKey: "ab.loadout.weapon")
     @State private var crewOn = RoamPrefs.crewOn
     @State private var district = 0
+    @State private var fit = UserDefaults.standard.object(forKey: "ab.loadout.fit") as? Int ?? -1
+    @State private var fitVer = 0
+    @State private var carKind = UserDefaults.standard.integer(forKey: "ab.loadout.carKind")
+    @State private var carColor = UserDefaults.standard.integer(forKey: "ab.loadout.carColor")
+
+    // name, top, pants, shoes, pants style
+    private let fits: [(String, Int, Int, Int, Int)] = [
+        ("STREET", 3, 5, 2, 1), ("ALL BLACK", 1, 4, 1, 1), ("RED SET", 4, 8, 3, 2), ("CLEAN", 6, 9, 2, 0), ("WORKWEAR", 8, 3, 5, 3)
+    ]
+    private let carNames = ["SEDAN", "SPORT", "TRUCK"]
+    private let carSub = ["BALANCED", "FAST · FRAGILE", "TOUGH · SLOW"]
+    private let carCols: [Color] = [
+        Color(red: 0.75, green: 0.12, blue: 0.12), Color(red: 0.12, green: 0.3, blue: 0.75), Color(red: 0.85, green: 0.78, blue: 0.2),
+        Color(white: 0.16), Color(white: 0.82), Color(red: 0.12, green: 0.5, blue: 0.3)
+    ]
+
+    private func applyFit(_ i: Int) {
+        let f = fits[i]
+        var l = TacAvatar.look(for: TacAvatar.myKey)
+        l.top = f.1; l.pants = f.2; l.shoes = f.3; l.pantsStyle = f.4
+        AvatarLooks.save(l, handle: TacAvatar.myKey)
+        fit = i
+        fitVer += 1
+        UserDefaults.standard.set(i, forKey: "ab.loadout.fit")
+    }
     @ObservedObject private var net = BlokNet.shared
 
     private var owned: Set<Int> { RoamState.loadOwned() }
@@ -147,6 +172,8 @@ struct OWLoadoutView: View {
     private func save() {
         UserDefaults.standard.set(weapon, forKey: "ab.loadout.weapon")
         UserDefaults.standard.set(crewOn, forKey: "ab.loadout.crew")
+        UserDefaults.standard.set(carKind, forKey: "ab.loadout.carKind")
+        UserDefaults.standard.set(carColor, forKey: "ab.loadout.carColor")
     }
 
     private func launch(_ pending: OWWorld.Pending?) {
@@ -160,6 +187,14 @@ struct OWLoadoutView: View {
         let d = ds[min(district, ds.count - 1)]
         return ZStack(alignment: .topLeading) {
             Color.black.opacity(0.72).ignoresSafeArea()
+            HoodLobbyStage(hero: true, preview: true, weapon: weapon, crew: false, version: fitVer)
+                .frame(width: size.width * 0.3, height: size.height * 0.8)
+                .position(x: size.width * 0.5, y: size.height * 0.56)
+                .allowsHitTesting(false)
+            Ellipse().fill(RadialGradient(colors: [orange.opacity(0.35), .clear], center: .center, startRadius: 2, endRadius: size.width * 0.1))
+                .frame(width: size.width * 0.2, height: size.height * 0.05)
+                .position(x: size.width * 0.5, y: size.height * 0.93)
+                .allowsHitTesting(false)
             Button { act(.screen(0)) } label: {
                 HStack(spacing: 5 * u) {
                     Image(systemName: "chevron.left").font(.system(size: 11 * u, weight: .bold))
@@ -182,7 +217,11 @@ struct OWLoadoutView: View {
                     chip("SOLO", icon: "person.fill", on: !crewOn) { crewOn = false }
                 }
                 choose("OUTFIT") {
-                    chip("SAFEHOUSE · CHANGE LOOK", icon: "tshirt.fill", on: false) { act(.screen(15)) }
+                    ForEach(0..<3, id: \.self) { i in chip(fits[i].0, on: fit == i) { applyFit(i) } }
+                }
+                choose("") {
+                    ForEach(3..<5, id: \.self) { i in chip(fits[i].0, on: fit == i) { applyFit(i) } }
+                    chip("SAFEHOUSE", icon: "house.fill", on: false) { act(.screen(15)) }
                 }
             }
             .padding(.leading, 24 * u).padding(.top, 52 * u)
@@ -208,6 +247,21 @@ struct OWLoadoutView: View {
                 }
                 primary("TERRITORY WAR", d.owner == .yours ? "Defend \(d.name)" : "Take \(d.name)", "flag.fill") {
                     launch(OWWorld.Pending(district: d.id, capture: d.owner != .yours, kind: .turf))
+                }
+                VStack(alignment: .trailing, spacing: 4 * u) {
+                    Text("YOUR RIDE").font(.jk(7.5 * u, .heavy)).tracking(1 * u).foregroundColor(.white.opacity(0.55))
+                    HStack(spacing: 4 * u) {
+                        ForEach(0..<3, id: \.self) { k in chip(carNames[k], icon: "car.fill", on: carKind == k) { carKind = k } }
+                    }
+                    Text(carSub[min(2, carKind)]).font(.jk(7 * u, .medium)).foregroundColor(.white.opacity(0.55))
+                    HStack(spacing: 6 * u) {
+                        ForEach(0..<6, id: \.self) { c in
+                            Button { carColor = c } label: {
+                                Circle().fill(carCols[c]).frame(width: 18 * u, height: 18 * u)
+                                    .overlay(Circle().stroke(carColor == c ? orange : Color.white.opacity(0.3), lineWidth: carColor == c ? 2.5 : 1))
+                            }.buttonStyle(.plain)
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

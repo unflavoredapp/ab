@@ -1277,6 +1277,8 @@ final class TacScene {
                 tl.position = MXVector3(-55, 19, Float(z)); tl.castsShadow = false
                 g.addChildNode(tl)
             }
+            if car.kind == 1 { g.scale = MXVector3(1.0, 0.82, 0.96) }
+            if car.kind == 2 { g.scale = MXVector3(1.1, 1.3, 1.12) }
             g.position = MXVector3(Float(sx(car.pos)), 0, Float(car.pos.y))
             root.addChildNode(g)
             carNodes.append(g)
@@ -1697,7 +1699,7 @@ final class TacScene {
         for (i, p) in e.players.enumerated() {
             let rt = roots[i]
             let show = (e.replayOn || p.team == e.me.team || p.spotted || (!p.alive && p.seenEver)) && (TMap.floorOf(p.pos) == focusFloor || (fpMode && linkedFloors.contains(TMap.floorOf(p.pos)) && TMap.crossLink(focus.pos, p.pos)))
-            rt.isHidden = !show || (e.gameMode == 10 && i == 0 && e.roam.driving >= 0)
+            rt.isHidden = !show || p.inCar || (e.gameMode == 10 && i == 0 && e.roam.driving >= 0)
             if !show { continue }
             let ks: Float = fpMode ? 1.18 : 1
             rt.scale = MXVector3(ks, ks * (p.crouch ? 0.74 : 1), ks)

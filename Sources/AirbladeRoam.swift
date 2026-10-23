@@ -68,6 +68,9 @@ final class RoamCar {
     var heading: CGFloat
     var speed: CGFloat = 0
     var hp: CGFloat = 120
+    var maxHP: CGFloat = 120
+    var kind = 0          // 0 sedan, 1 sport, 2 truck
+    var mine = false
     let home: CGPoint
     let homeHeading: CGFloat
     let color: Int

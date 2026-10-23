@@ -75,7 +75,7 @@ struct RoamMinimap: View {
         for car in e.roam.cars where !car.wrecked {
             let q = s(car.pos)
             if hypot(q.x - c.x, q.y - c.y) > sz.width / 2 - 3 { continue }
-            ctx.fill(Path(roundedRect: CGRect(x: q.x - 2.2, y: q.y - 1.5, width: 4.4, height: 3), cornerRadius: 0.8), with: .color(Color.white.opacity(0.7)))
+            ctx.fill(Path(roundedRect: CGRect(x: q.x - 2.2, y: q.y - 1.5, width: 4.4, height: 3), cornerRadius: 0.8), with: .color(car.mine ? Color(red: 1, green: 0.55, blue: 0.16) : Color.white.opacity(0.7)))
         }
         // other people
         for p in e.players where p.alive && !p.isPlayer {
@@ -191,12 +191,12 @@ struct RoamCarHUD: View {
                     }
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.18))
-                        Capsule().fill(c.hp > 40 ? Color(red: 0.3, green: 0.85, blue: 0.45) : Color(red: 1, green: 0.3, blue: 0.26)).frame(width: 90 * max(0, c.hp) / 120)
+                        Capsule().fill(c.hp > c.maxHP / 3 ? Color(red: 0.3, green: 0.85, blue: 0.45) : Color(red: 1, green: 0.3, blue: 0.26)).frame(width: 90 * max(0, c.hp) / max(1, c.maxHP))
                     }.frame(width: 90, height: 4)
                 }
                 .padding(8).background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.5)))
-                if c.hp < 40 {
-                    Text(c.hp < 20 ? "NEAR WRECK" : "ENGINE DAMAGED").font(.jk(8, .heavy)).tracking(1)
+                if c.hp < c.maxHP / 3 {
+                    Text(c.hp < c.maxHP / 6 ? "NEAR WRECK" : "ENGINE DAMAGED").font(.jk(8, .heavy)).tracking(1)
                         .foregroundColor(Color(red: 1, green: 0.3, blue: 0.26))
                         .padding(.horizontal, 8).frame(height: 18)
                         .background(Capsule().fill(Color.black.opacity(0.6)))

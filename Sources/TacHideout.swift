@@ -95,6 +95,9 @@ struct HideoutBackdrop: View {
         } else if HideoutStage.available {
             // the real 3D room, rendered live by the Metal engine
             HideoutStage(hero: hero).ignoresSafeArea()
+        } else if hero || Self.bgImage == nil {
+            // procedural rooftop with the hero, his weapon and your crew
+            HoodLobbyStage(hero: hero, weapon: UserDefaults.standard.integer(forKey: "ab.loadout.weapon"), crew: RoamPrefs.crewOn).ignoresSafeArea()
         } else if let bg = Self.bgImage {
             GeometryReader { g in
                 Image(uiImage: bg).resizable().interpolation(.high).scaledToFill()

@@ -191,7 +191,8 @@ struct AirbladeTouchControls: View {
             let wc = L.c("weapon")
             if e.gameMode != 10 { AirbladeWeaponBox(e: e).scaleEffect(wc.scale).position(wc.point(W, H)) }
         }
-        .opacity(L.opacity)
+        .opacity(e.gameMode == 10 && e.roam.driving >= 0 ? 0 : L.opacity)
+        .allowsHitTesting(!(e.gameMode == 10 && e.roam.driving >= 0))
     }
 }
 

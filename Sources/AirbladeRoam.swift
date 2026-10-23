@@ -256,10 +256,15 @@ struct RoamHUD: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 8)
                 .allowsHitTesting(false)
-            tracker
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, 40)
-                .allowsHitTesting(false)
+            VStack(spacing: 5) {
+                RoamCompass(e: e)
+                tracker
+                RoamThreat(e: e)
+                RoamEventCard()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 36)
+            .allowsHitTesting(false)
             jobsButton
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 18).padding(.top, 150)

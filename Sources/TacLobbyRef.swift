@@ -162,6 +162,11 @@ struct LobbyHome: View {
         Text(s).font(.jk(10 * u, .heavy)).tracking(0.3 * u).foregroundColor(.white.opacity(0.92))
     }
 
+    /// BLOK PHONE preview: latest BLOKUP post, unread BLOKCHAT, newest BLOK WATCH alert
+    private var phonePreview: some View {
+        BlokPhonePreview(u: u, glass: glass, edge: edge) { act(.screen(19)) }
+    }
+
     private var warPanel: some View {
         Button { act(.launch(5)) } label: {
             HStack(spacing: 8 * u) {
@@ -319,6 +324,7 @@ struct LobbyHome: View {
             .padding(.leading, 27 * u).padding(.top, 52 * u)
 
             VStack(alignment: .trailing, spacing: 5 * u) {
+                phonePreview
                 warPanel
                 challengesPanel
                 crewPanel
@@ -353,5 +359,52 @@ struct LobbyHome: View {
             if ![0, 1, 5, 8, 9, 10].contains(nav.tacMode) { nav.tacMode = 10 }
             if !TacLobbyMaps.ids.contains(nav.tacMap) && !(nav.tacMap == 10 && nav.tacMode == 10) { nav.tacMap = TacLobbyMaps.fallback }
         }
+    }
+}
+
+
+struct BlokPhonePreview: View {
+    let u: CGFloat
+    let glass: Color
+    let edge: Color
+    let open: () -> Void
+    @ObservedObject var net = BlokNet.shared
+    private let orange = Color(red: 1, green: 0.55, blue: 0.16)
+
+    private func row(_ icon: String, _ tag: String, _ text: String, _ badge: Int = 0) -> some View {
+        HStack(spacing: 5 * u) {
+            Image(systemName: icon).font(.system(size: 8 * u, weight: .bold)).foregroundColor(orange).frame(width: 11 * u)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(tag).font(.jk(6.5 * u, .heavy)).tracking(0.8 * u).foregroundColor(.white.opacity(0.55))
+                Text(text).font(.jk(7.5 * u, .semibold)).foregroundColor(.white).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if badge > 0 {
+                Text("\(badge)").font(.jk(7 * u, .heavy)).foregroundColor(.black)
+                    .frame(minWidth: 12 * u, minHeight: 12 * u).background(Circle().fill(orange))
+            }
+        }
+    }
+
+    var body: some View {
+        let post = net.posts.first
+        let unread = net.threads.reduce(0) { $0 + $1.unread }
+        let msg = net.threads.first(where: { $0.unread > 0 })
+        let alert = net.alerts.first
+        return Button(action: open) {
+            VStack(alignment: .leading, spacing: 4 * u) {
+                HStack {
+                    Text("BLOK PHONE").font(.jk(9 * u, .heavy)).tracking(0.6 * u).foregroundColor(.white.opacity(0.92))
+                    Spacer()
+                    Image(systemName: "iphone").font(.system(size: 9 * u)).foregroundColor(orange)
+                }
+                row("camera.fill", "BLOKUP", post.map { "@\($0.handle): \($0.text)" } ?? "No posts yet")
+                row("bubble.left.fill", "BLOKCHAT", msg.map { "\($0.id): \($0.msgs.last?.text ?? "")" } ?? "No new messages", unread)
+                row("eye.fill", "BLOK WATCH", alert?.text ?? "All quiet")
+            }
+            .padding(.horizontal, 9 * u).padding(.vertical, 6 * u).frame(width: 190 * u)
+            .background(RoundedRectangle(cornerRadius: 4 * u).fill(glass))
+            .overlay(RoundedRectangle(cornerRadius: 4 * u).stroke(edge, lineWidth: 1))
+        }.buttonStyle(.plain)
     }
 }

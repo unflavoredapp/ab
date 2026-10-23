@@ -139,7 +139,7 @@ struct RoamCarHUD: View {
     private var content: some View {
         let driving = e.roam.driving >= 0
         let car: RoamCar? = driving ? e.roam.cars[e.roam.driving] : nil
-        VStack(alignment: .trailing, spacing: 6) {
+        return VStack(alignment: .trailing, spacing: 6) {
             if let c = car {
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(alignment: .lastTextBaseline, spacing: 3) {
@@ -152,6 +152,13 @@ struct RoamCarHUD: View {
                     }.frame(width: 90, height: 4)
                 }
                 .padding(8).background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.5)))
+                if c.hp < 40 {
+                    Text(c.hp < 20 ? "NEAR WRECK" : "ENGINE DAMAGED").font(.jk(8, .heavy)).tracking(1)
+                        .foregroundColor(Color(red: 1, green: 0.3, blue: 0.26))
+                        .padding(.horizontal, 8).frame(height: 18)
+                        .background(Capsule().fill(Color.black.opacity(0.6)))
+                        .overlay(Capsule().stroke(Color(red: 1, green: 0.3, blue: 0.26), lineWidth: 1))
+                }
             }
             if driving || e.roamNearCar != nil {
                 Button { e.roamInteract() } label: {

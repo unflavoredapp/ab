@@ -1175,7 +1175,7 @@ final class TacScene {
             roots.append(rt); bodies.append(body); heads.append(head); guns.append(gun); flashes.append(fl)
             headKey.append("")
         }
-        buildCars(e)
+        buildCars(e, root)
         // pools
         for _ in 0..<60 {
             let b = MXNode(geometry: MXBox(width: 26, height: 2.4, length: 2.4, chamferRadius: 0))
@@ -1234,7 +1234,7 @@ final class TacScene {
     // MARK: props
 
     /// Free Roam cars: a low body, a cabin, four wheels and lights; one node per car, moved by the engine
-    private func buildCars(_ e: TacticalEngine) {
+    private func buildCars(_ e: TacticalEngine, _ root: MXNode) {
         carNodes = []
         guard e.gameMode == 10 else { return }
         let cols: [UIColor] = [UIColor(red: 0.75, green: 0.12, blue: 0.12, alpha: 1), UIColor(red: 0.12, green: 0.3, blue: 0.75, alpha: 1),

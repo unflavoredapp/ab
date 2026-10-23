@@ -6,6 +6,13 @@ import SwiftUI
 // a hashtag on TRENDS, an alert on BLOK WATCH, a DM in BLOKCHAT and a change to your REP. Ambient city drama
 // (crews switching, people getting exposed, rumours) is generated on a timer so the feed is alive even when you are quiet.
 
+struct BlokCard: Identifiable {
+    let id = UUID()
+    var title: String
+    var lines: [String]
+    var color: Color
+}
+
 enum BlokEvent {
     case captured(Int)              // district id
     case lost(Int)
@@ -84,6 +91,7 @@ final class BlokNet: ObservableObject {
     @Published var trends: [String: Int] = [:]
     @Published var rep = BlokRep()
     @Published var status = "Grinding"
+    @Published var card: BlokCard? = nil
     @Published var seenPosts = 0
     @Published var captures = 0
     @Published var bossDowns = 0
@@ -177,6 +185,15 @@ final class BlokNet: ObservableObject {
 
     // MARK: one event, every app
 
+    /// one event, one card: what it did to the district, your REP and the phone
+    func showCard(_ title: String, _ lines: [String], _ color: Color) {
+        let c = BlokCard(title: title, lines: lines, color: color)
+        DispatchQueue.main.async {
+            self.card = c
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { if self.card?.id == c.id { self.card = nil } }
+        }
+    }
+
     func emit(_ ev: BlokEvent) {
         let me = UserDefaults.standard.string(forKey: "ab.playername") ?? "MRZEFV"
         switch ev {
@@ -187,18 +204,21 @@ final class BlokNet: ObservableObject {
             alert("\(n) captured by your crew", d)
             dm("Rico", "We got \(n), twin. Hold it down.")
             bump { $0.respect += 6; $0.loyalty += 3; $0.kings -= 2 }
+            showCard("DISTRICT TAKEN", [n.uppercased() + " IS YOURS", "+ RESPECT   ·   KINGS RELATION DOWN", "NEW POSTS ON BLOKUP"], OWDistrict.all[d].color)
         case .lost(let d):
             let n = district(d)
             post("blokwatch.daily", "\(n) fell. Somebody ain't holding their corner 😭", tag: n.uppercased().replacingOccurrences(of: " ", with: ""), likes: 90, comments: ["who let this happen"])
             alert("\(n) lost to a rival crew", d)
             dm("Rico", "They took \(n). We gotta answer that.", invite: true)
             bump { $0.loyalty -= 3; $0.respect -= 2 }
+            showCard("DISTRICT LOST", [n.uppercased() + " FELL", "− RESPECT   ·   CREW LOYALTY DOWN", "RICO WANTS AN ANSWER"], Color(red: 1, green: 0.3, blue: 0.26))
         case .bossDown(let name):
             DispatchQueue.main.async { self.bossDowns += 1 }
             post("viper.row.exposed", "\(name.uppercased()) GOT DROPPED IN THE STREET. Somebody film that?? 😭😭", tag: "\(name.uppercased())DOWN", likes: 300, comments: ["it's over for them", "who did this"])
             alert("\(name) taken down", 2)
             dm("Viper_Ghost", "You made a mistake. We know your face.")
             bump { $0.respect += 10; $0.fear += 12; $0.vipers -= 20; $0.loyalty += 4 }
+            showCard("\(name.uppercased()) ELIMINATED", ["+ RESPECT   ·   + FEAR", "VIPER ROW RELATION DOWN"], Color(red: 1, green: 0.55, blue: 0.16))
         case .crewKO(let victim, let tier):
             koCount += 1
             bump { $0.respect += tier > 0 ? 1.4 : 0.5; $0.fear += 0.6; $0.vipers -= 1; $0.kings -= 0.5 }
@@ -215,6 +235,7 @@ final class BlokNet: ObservableObject {
         case .jobDone(let title):
             post("dee.onthemove", "\(me) delivered. Clean. \(title.capitalized) done ✅", tag: "BLOK", likes: 45, comments: ["he moves different"])
             bump { $0.respect += 2; $0.loyalty += 1.5 }
+            showCard("CONTRACT DONE", [title.uppercased(), "+ RESPECT"], Color(red: 1, green: 0.8, blue: 0.25))
         case .wreck:
             DispatchQueue.main.async { self.wrecks += 1 }
             post("whip.watch", "Somebody just wrecked a whip on the main strip 🚗💀", tag: "WRECKED", likes: 55, comments: ["insurance??"])

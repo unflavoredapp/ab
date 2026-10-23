@@ -75,7 +75,7 @@ enum TacRank {
 
     static func totalXP(_ t: TacData) -> Int {
         prestigeCache = t.prestige ?? 0
-        return max(0, (t.wins + t.losses) * 40 + t.kills * 10 + t.wins * 60 + (t.xpExtra ?? 0) - (t.xpBase ?? 0))
+        return max(0, (t.wins + t.losses) * 40 + t.kills * 10 + t.wins * 60 + (t.xpExtra ?? 0) - (t.xpBase ?? 0)) + HBLevel.roamXP
     }
 
     static func index(_ xp: Int) -> Int {

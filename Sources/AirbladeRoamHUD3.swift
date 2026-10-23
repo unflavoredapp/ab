@@ -21,7 +21,7 @@ struct RoamCompass: View {
 
     private var strip: some View {
         let heading = Double(e.me.aim) * 180 / .pi + 90   // 0 = north
-        let w: CGFloat = 220, ppd: CGFloat = 1.6
+        let w: CGFloat = 180, ppd: CGFloat = 1.35
         var objDelta: Double? = nil
         if let t = e.roamMarker {
             let b = Double(atan2(t.y - e.me.pos.y, t.x - e.me.pos.x)) * 180 / .pi + 90
@@ -30,7 +30,7 @@ struct RoamCompass: View {
         return ZStack {
             ForEach(Array(stride(from: 0, to: 360, by: 15)), id: \.self) { m in
                 let dd = wrap(Double(m) - heading)
-                if abs(dd) < 66 {
+                if abs(dd) < 62 {
                     let card = m % 90 == 0
                     VStack(spacing: 1) {
                         if card {
@@ -44,15 +44,20 @@ struct RoamCompass: View {
             }
             if let od = objDelta {
                 Image(systemName: "diamond.fill").font(.system(size: 8, weight: .bold)).foregroundColor(gold)
-                    .offset(x: CGFloat(max(-66, min(66, od))) * ppd, y: 12)
+                    .offset(x: CGFloat(max(-62, min(62, od))) * ppd, y: 10)
             }
             Image(systemName: "triangle.fill").font(.system(size: 5)).foregroundColor(orange)
                 .rotationEffect(.degrees(180)).offset(y: -9)
         }
-        .frame(width: w, height: 26)
-        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.4)))
-        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .frame(width: w, height: 22)
+        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.28)))
         .clipped()
+        .overlay(alignment: .trailing) {
+            if let t = e.roamMarker {
+                Text("\(Int(tDist(t, e.me.pos) / 33)) m").font(.jk(9, .heavy)).foregroundColor(gold).monospacedDigit()
+                    .padding(.horizontal, 5).background(Color.black.opacity(0.5)).offset(x: 40)
+            }
+        }
     }
 }
 
@@ -77,6 +82,24 @@ struct RoamThreat: View {
                 .background(Capsule().fill(Color.black.opacity(0.55)))
                 .overlay(Capsule().stroke(col.opacity(hot ? 0.5 + 0.5 * pulse : 0.6), lineWidth: 1.4))
                 .transition(.opacity)
+            }
+        }
+    }
+}
+
+/// shown while you are in the river
+struct RoamSwim: View {
+    let e: TacticalEngine
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.3)) { _ in
+            if e.roam.swim {
+                HStack(spacing: 5) {
+                    Image(systemName: "drop.fill").font(.system(size: 9, weight: .bold))
+                    Text("SWIMMING · SLOW").font(.jk(8.5, .heavy)).tracking(1)
+                }
+                .foregroundColor(Color(red: 0.5, green: 0.85, blue: 1))
+                .padding(.horizontal, 9).frame(height: 20)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
             }
         }
     }

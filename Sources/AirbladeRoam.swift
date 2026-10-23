@@ -47,6 +47,7 @@ struct RoamState {
     /// weapons: 0 fists, 1 bat, 2 pistol; owned slots persist between sessions
     var weapon = 0
     var waypoint: CGPoint? = nil
+    var swim = false
     var owned: Set<Int> = [0]
     static let magSize = 12
     var ammo = 12
@@ -118,27 +119,13 @@ struct RoamHUD: View {
     @State private var phoneOpen = false
 
     private var pills: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             HStack(spacing: 6) {
                 Text("$").font(.jk(9, .heavy)).foregroundColor(.black.opacity(0.75)).frame(width: 17, height: 17).background(Circle().fill(gold))
                 Text("\(e.roam.cash)").font(.jk(12, .semibold)).foregroundColor(.white).monospacedDigit()
             }
-            .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.45))).overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-            if e.roam.lastDistrict >= 0 {
-                let d = OWDistrict.all[e.roam.lastDistrict]
-                HStack(spacing: 5) {
-                    Image(systemName: "mappin.circle.fill").font(.system(size: 10, weight: .bold)).foregroundColor(d.color)
-                    Text(d.name).font(.jk(9, .heavy)).foregroundColor(.white).lineLimit(1)
-                    Text("\(d.control)%").font(.jk(9, .heavy)).foregroundColor(d.color).monospacedDigit()
-                }
-                .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.45))).overlay(Capsule().stroke(d.color.opacity(0.6), lineWidth: 1))
-            }
-            HStack(spacing: 6) {
-                Text("K.O.").font(.jk(7, .heavy)).foregroundColor(.black.opacity(0.75)).frame(width: 17, height: 17).background(Circle().fill(Color(red: 0.4, green: 0.7, blue: 1)))
-                Text("\(e.roam.crewKOs + e.roam.civKOs)").font(.jk(12, .semibold)).foregroundColor(.white).monospacedDigit()
-                if e.comboN >= 2 { Text("x\(e.comboN)").font(.jk(10, .heavy)).foregroundColor(orange) }
-            }
-            .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.45))).overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            .padding(.horizontal, 9).frame(height: 24).background(Capsule().fill(Color.black.opacity(0.4)))
+            if e.comboN >= 2 { Text("x\(e.comboN)").font(.jk(12, .heavy)).foregroundColor(orange) }
         }
         .shadow(color: .black.opacity(0.5), radius: 2)
     }
@@ -156,24 +143,20 @@ struct RoamHUD: View {
         }
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Image(systemName: "doc.text.fill").font(.system(size: 12, weight: .bold)).foregroundColor(gold)
-                Text(j == nil ? "NO ACTIVE CONTRACT" : "ACTIVE CONTRACT").font(.jk(7.5, .semibold)).tracking(0.8).foregroundColor(gold)
-            }
-            Text(j?.title ?? "Open your phone to take a job").font(.jk(11, .heavy)).foregroundColor(.white).lineLimit(1)
-            if let j = j {
-                Text(e.roamObjectiveText).font(.jk(8, .medium)).foregroundColor(.white.opacity(0.8)).lineLimit(1)
-                HStack {
-                    Text(prog).font(.jk(8, .heavy)).foregroundColor(.white).monospacedDigit()
-                    Spacer()
+                Image(systemName: "doc.text.fill").font(.system(size: 10, weight: .bold)).foregroundColor(gold)
+                Text(j?.title ?? "NO ACTIVE CONTRACT").font(.jk(10, .heavy)).foregroundColor(.white).lineLimit(1)
+                Spacer(minLength: 4)
+                if let j = j {
                     if j.kind == .drop { Text(ABRules.mmss(Double(j.timeLeft))).font(.jk(8, .heavy)).foregroundColor(j.timeLeft < 25 ? Color(red: 1, green: 0.3, blue: 0.26) : .white).monospacedDigit() }
-                    Text("$\(j.reward)").font(.jk(8, .heavy)).foregroundColor(gold)
+                    Text(prog).font(.jk(8, .heavy)).foregroundColor(gold).monospacedDigit()
                 }
             }
+            if j != nil {
+                Text(e.roamObjectiveText).font(.jk(8, .medium)).foregroundColor(.white.opacity(0.75)).lineLimit(1)
+            }
         }
-        .padding(.horizontal, 9).padding(.vertical, 6).frame(width: 190, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 3).fill(Color(red: 0.03, green: 0.05, blue: 0.09).opacity(0.78)))
-        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.white.opacity(0.2), lineWidth: 1))
-        .shadow(color: .black.opacity(0.5), radius: 2)
+        .padding(.horizontal, 9).padding(.vertical, 5).frame(width: 190, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 3).fill(Color(red: 0.03, green: 0.05, blue: 0.09).opacity(0.6)))
     }
 
     private func distText(_ d: CGFloat) -> String { "\(Int(d / 33)) m" }
@@ -282,8 +265,8 @@ struct RoamHUD: View {
                 .allowsHitTesting(false)
             VStack(spacing: 5) {
                 RoamCompass(e: e)
-                tracker
                 RoamThreat(e: e)
+                RoamSwim(e: e)
                 RoamEventCard()
                 RoamRepToast()
             }
@@ -292,7 +275,7 @@ struct RoamHUD: View {
             .padding(.top, 36)
             .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) { jobsButton; gearButton }
+                jobsButton
                 RoamCrewStrip(e: e)
             }
             .scaleEffect(sc, anchor: .topLeading)
@@ -302,6 +285,7 @@ struct RoamHUD: View {
                 .scaleEffect(sc, anchor: left ? .topLeading : .topTrailing)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: left ? .topLeading : .topTrailing)
                 .padding(left ? .leading : .trailing, mapPad).padding(.top, 8)
+                .onLongPressGesture(minimumDuration: 0.6) { settingsOpen = true }
             }
             Group {
             if !mapBig {
@@ -333,6 +317,7 @@ struct RoamHUD: View {
             if e.roam.jobsOpen {
                 jobsPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            RoamLevelWatcher()
             if settingsOpen {
                 RoamHUDSettings { settingsOpen = false }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

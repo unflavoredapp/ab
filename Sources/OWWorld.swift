@@ -38,7 +38,9 @@ final class OWWorld {
 
     /// which district a Town position belongs to: nearest district centre on the map layout
     static func districtAt(_ p: CGPoint) -> Int {
-        let n = CGPoint(x: p.x / max(1, TMap.W), y: p.y / max(1, TMap.H))
+        // world positions carry the floor offset; plan positions do not
+        let lx = p.x >= TMap.off ? p.x - TMap.origin(TMap.floorOf(p)) : p.x
+        let n = CGPoint(x: lx / max(1, TMap.W), y: p.y / max(1, TMap.H))
         var best = 0, bd = CGFloat.greatestFiniteMagnitude
         for d in OWDistrict.base {
             let dd = hypot(d.label.x - n.x, d.label.y - n.y)
@@ -50,6 +52,6 @@ final class OWWorld {
     /// Town position of a district's centre
     static func townPoint(_ id: Int) -> CGPoint {
         let l = OWDistrict.base[id].label
-        return CGPoint(x: l.x * TMap.W, y: l.y * TMap.H)
+        return CGPoint(x: l.x * TMap.W + TMap.off, y: l.y * TMap.H)
     }
 }

@@ -91,6 +91,7 @@ enum TNav {
         let fl = TMap.floorOf(p)
         if p.x - TMap.origin(fl) > TMap.W - 20 || p.y > TMap.H - 20 { return true }
         for k in floorSolids[fl] where TMap.baseSolid[k].insetBy(dx: -18, dy: -18).contains(p) { return true }
+        if TCity.inWater(p) { return true }
         return TMap.stairBlocked(p)
     }
 
@@ -125,6 +126,14 @@ enum TNav {
                     let cx = CGFloat(c) * cell + cell / 2
                     for r in r0...r1 where q.contains(CGPoint(x: cx, y: CGFloat(r) * cell + cell / 2)) { b[r * cols + c] = true }
                 }
+            }
+        }
+        if TMap.kind == 10 {
+            // water is off limits to bots and spawns; only the bridges cross
+            for c in 0..<cols {
+                let px = CGFloat(c) * cell + cell / 2
+                if px - TMap.off < TCity.riverX0 - 60 || px - TMap.off > TCity.riverX1 + 60 { continue }
+                for r in 0..<rows where TCity.inWater(CGPoint(x: px, y: CGFloat(r) * cell + cell / 2)) { b[r * cols + c] = true }
             }
         }
         blocked = b
@@ -1281,7 +1290,7 @@ final class TacticalEngine {
         if gameMode == 10 && roam.driving >= 0 { roamDrive(dt); return }
         if p.crouch && !coverNear(p) { p.crouch = false }
         let legMul: CGFloat = (gameMode == 6 && legWound) ? 0.62 : 1
-        let sp: CGFloat = (p.crouch ? 88 : (p.knife ? 195 : 170)) * (scoped ? 0.6 : (ads ? 0.75 : 1)) * legMul
+        let sp: CGFloat = (p.crouch ? 88 : (p.knife ? 195 : 170)) * (scoped ? 0.6 : (ads ? 0.75 : 1)) * legMul * (gameMode == 10 && TCity.inWater(p.pos) ? 0.5 : 1)
         var mv = move
         let tgt = autoAim ? pickTarget(p) : nil
         autoTarget = tgt?.id ?? -1
@@ -3408,7 +3417,7 @@ extension TacticalEngine {
     private func roamControl(_ id: Int, _ delta: Int) {
         let r = OWWorld.shared.add(id, delta)
         let name = OWDistrict.base[id].name
-        if r.old < 55 && r.new >= 55 { banner = "TERRITORY CAPTURED  ·  \(name)"; bannerT = 3.5; BlokNet.shared.emit(.captured(id)) }
+        if r.old < 55 && r.new >= 55 { HBLevel.add(150); banner = "TERRITORY CAPTURED  ·  \(name)"; bannerT = 3.5; BlokNet.shared.emit(.captured(id)) }
         else if r.old > 35 && r.new <= 35 { banner = "TERRITORY LOST  ·  \(name)"; bannerT = 3.5; BlokNet.shared.emit(.lost(id)) }
     }
 
@@ -3509,6 +3518,7 @@ extension TacticalEngine {
         }
         roam.bestCombo = max(roam.bestCombo, bestCombo)
         if me.alive { roam.lastDistrict = OWWorld.districtAt(me.pos) }
+        roam.swim = roam.driving < 0 && TCity.inWater(me.pos)
         let mePos = me.pos
         for p in players where !p.isPlayer {
             if p.stun > 0 { p.stun -= dt }
@@ -3693,6 +3703,9 @@ extension TacticalEngine {
             roamControl(dis, -1)
         } else {
             roam.crewKOs += 1
+            let gain = [20, 45, 250][min(2, v.tier)]
+            HBLevel.add(gain)
+            pop(v.pos, "+\(gain) XP", TUI.gold)
             BlokNet.shared.emit(v.tier == 2 ? .bossDown(v.name) : .crewKO(v.name, v.tier))
             OWOnline.shared.progress(1)
             pay = [60, 120, 400][min(2, v.tier)]
@@ -3762,6 +3775,9 @@ extension TacticalEngine {
     private func roamComplete() {
         guard let j = roam.job else { return }
         roam.cash += j.reward
+        let jx = 80 + j.reward / 6
+        HBLevel.add(jx)
+        pop(me.pos, "+\(jx) XP", TUI.gold)
         roam.jobsDone += 1
         BlokNet.shared.emit(.jobDone(j.title))
         let jd = j.district >= 0 ? j.district : OWWorld.districtAt(me.pos)
@@ -3967,6 +3983,12 @@ extension TacticalEngine {
             let hit = abs(c.speed)
             if hit > 150 { c.hp -= (hit - 120) / 9; shake = max(shake, min(10, hit / 70)) }
             c.speed *= 0.35
+        }
+        if TCity.inWater(np) {
+            c.hp -= 70 * dt
+            c.speed *= max(0, 1 - 1.8 * dt)
+            shake = max(shake, 3)
+            if bannerT <= 0 { banner = "CAR IN WATER"; bannerT = 1 }
         }
         c.pos = np
         p.pos = np

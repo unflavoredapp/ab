@@ -13,6 +13,27 @@ enum TCity {
     static func roadW(_ i: Int) -> CGFloat { i % 4 == 0 ? 300 : 200 }
     static let alleyW: CGFloat = 120
 
+    // the river: a north-south band between the second and third avenues, crossed by bridges on every other street
+    static let riverCol = 2
+    static var riverX0: CGFloat { xs[2] + roadW(2) / 2 }
+    static var riverX1: CGFloat { xs[3] - roadW(3) / 2 }
+    static var riverTop: CGFloat { ys.first! - roadW(0) / 2 }
+    static var riverBot: CGFloat { ys.last! + roadW(ys.count - 1) / 2 }
+    static let bridgeRows = [0, 2, 4, 6, 8]
+
+    /// plan coordinates: water, bridges excluded
+    static func inWaterPlan(_ p: CGPoint) -> Bool {
+        guard p.x > riverX0, p.x < riverX1, p.y > riverTop, p.y < riverBot else { return false }
+        for j in bridgeRows where abs(p.y - ys[j]) < roadW(j) / 2 { return false }
+        return true
+    }
+
+    /// world coordinates (with the floor offset), only in the city
+    static func inWater(_ p: CGPoint) -> Bool {
+        guard TMap.kind == 10 else { return false }
+        return inWaterPlan(CGPoint(x: p.x - TMap.off, y: p.y))
+    }
+
     /// where parked cars start (position, heading) for the drivable cars
     static var carSpots: [(CGPoint, CGFloat)] = []
     /// one street junction per district, used for spawns and the player's hideout
@@ -54,6 +75,7 @@ enum TCity {
         // blocks
         for i in 0..<(xs.count - 1) {
             for j in 0..<(ys.count - 1) {
+                if i == riverCol { continue }
                 let x0 = xs[i] + roadW(i) / 2, x1 = xs[i + 1] - roadW(i + 1) / 2
                 let y0 = ys[j] + roadW(j) / 2, y1 = ys[j + 1] - roadW(j + 1) / 2
                 let blk = rc(x0, y0, x1 - x0, y1 - y0)
@@ -73,6 +95,9 @@ enum TCity {
             }
         }
 
+        // the river itself: open ground that the scene floods
+        b.gap(1, rc(riverX0, riverTop, riverX1 - riverX0, riverBot - riverTop), st)
+
         // parked cars along the street edges (these are the drivable ones)
         for i in 0..<xs.count {
             for j in 0..<ys.count where rnd(i, j, 9) < 0.33 {
@@ -87,7 +112,7 @@ enum TCity {
                 }
             }
         }
-        carSpots = carSpots.filter { $0.0.x < right - 100 && $0.0.y < bot - 100 }
+        carSpots = carSpots.filter { $0.0.x < right - 100 && $0.0.y < bot - 100 && !inWaterPlan($0.0) }
 
         b.rooms.append(TRoom(name: "HoodBlok", r: MapBuilder.R(1, rc(0, 0, W, W)), mat: 0, fl: 1))
         b.doors = []
@@ -106,6 +131,7 @@ enum TCity {
         for x in xs { for y in ys { spawns.append(P(CGPoint(x: x, y: y))) } }
         for i in 0..<(xs.count - 1) { for j in 0..<ys.count { spawns.append(P(CGPoint(x: (xs[i] + xs[i + 1]) / 2, y: ys[j]))) } }
         for i in 0..<xs.count { for j in 0..<(ys.count - 1) { spawns.append(P(CGPoint(x: xs[i], y: (ys[j] + ys[j + 1]) / 2))) } }
+        spawns = spawns.filter { !inWaterPlan(CGPoint(x: $0.x - off, y: $0.y)) }
         let h0 = hubs[0], h5 = hubs[5]
         let atk = (0..<5).map { P(CGPoint(x: h0.x + 40 + CGFloat($0) * 30, y: h0.y)) }
         let def = (0..<5).map { P(CGPoint(x: h5.x + 40 + CGFloat($0) * 30, y: h5.y)) }

@@ -50,6 +50,16 @@ struct RoamMinimap: View {
         func s(_ p: CGPoint) -> CGPoint { CGPoint(x: c.x + (p.x - me.pos.x) * k, y: c.y + (p.y - me.pos.y) * k) }
         func w(_ q: CGPoint) -> CGPoint { CGPoint(x: me.pos.x + (q.x - c.x) / k, y: me.pos.y + (q.y - c.y) / k) }
         let win = CGRect(x: me.pos.x - span / 2 - 40, y: me.pos.y - span / 2 - 40, width: span + 80, height: span + 80)
+        if TMap.kind == 10 {
+            // river and bridges
+            let wx0 = TCity.riverX0 + TMap.off, wx1 = TCity.riverX1 + TMap.off
+            let p0 = s(CGPoint(x: wx0, y: TCity.riverTop)), p1 = s(CGPoint(x: wx1, y: TCity.riverBot))
+            ctx.fill(Path(CGRect(x: p0.x, y: p0.y, width: p1.x - p0.x, height: p1.y - p0.y)), with: .color(Color(red: 0.12, green: 0.42, blue: 0.72).opacity(0.9)))
+            for j in TCity.bridgeRows {
+                let a = s(CGPoint(x: wx0 - 60, y: TCity.ys[j] - TCity.roadW(j) / 2)), b2 = s(CGPoint(x: wx1 + 60, y: TCity.ys[j] + TCity.roadW(j) / 2))
+                ctx.fill(Path(CGRect(x: a.x, y: a.y, width: b2.x - a.x, height: b2.y - a.y)), with: .color(Color(red: 0.55, green: 0.58, blue: 0.62)))
+            }
+        }
         var walls = Path()
         for r in TMap.solid where r.minX > -5000 && r.intersects(win) {
             walls.addRect(CGRect(x: s(r.origin).x, y: s(r.origin).y, width: r.width * k, height: r.height * k))
@@ -142,7 +152,7 @@ struct RoamWeaponBar: View {
 
     private var content: some View {
         HStack(spacing: 4) {
-            ForEach(0..<3, id: \.self) { w in
+            ForEach((0..<3).filter { e.roam.owned.contains($0) }, id: \.self) { w in
                 let owned = e.roam.owned.contains(w)
                 let on = e.roam.weapon == w
                 Button { e.roamSelect(w) } label: {

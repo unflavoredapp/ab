@@ -57,13 +57,13 @@ struct LobbyTopBar: View {
                 VStack(alignment: .leading, spacing: 3 * u) {
                     Text(TacProfile.name.uppercased()).font(.jk(10.5 * u, .heavy)).italic().foregroundColor(.white).lineLimit(1)
                     HStack(spacing: 6 * u) {
-                        Text("Lv. \(ri + 1)").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
+                        Text("Lv. \(HBLevel.level(xp))").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
                         Spacer(minLength: 0)
-                        Text("EXP \(Int(TacRank.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
+                        Text("EXP \(Int(HBLevel.progress(xp) * 100))%").font(.jk(8 * u, .semibold)).foregroundColor(.white.opacity(0.7)).fixedSize()
                     }
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.14))
-                        Capsule().fill(blue).frame(width: 100 * u * CGFloat(TacRank.progress(xp)))
+                        Capsule().fill(blue).frame(width: 100 * u * CGFloat(HBLevel.progress(xp)))
                     }
                     .frame(width: 100 * u, height: 3.5 * u)
                 }

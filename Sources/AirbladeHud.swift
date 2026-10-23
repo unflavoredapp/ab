@@ -46,7 +46,7 @@ struct AirbladeHud: View {
     @EnvironmentObject var game: Game
 
     private var xp: Int { TacRank.totalXP(game.s.ex.tac ?? TacData()) }
-    private var level: Int { TacRank.index(xp) + 1 }
+    private var level: Int { HBLevel.level(xp) }
 
     private func score(_ i: Int) -> Int { e.scores.indices.contains(i) ? e.scores[i] : 0 }
 
@@ -60,7 +60,7 @@ struct AirbladeHud: View {
         return HStack(alignment: .center, spacing: 6) {
             ZStack {
                 Circle().fill(Color.black.opacity(0.45))
-                Circle().trim(from: 0, to: CGFloat(max(0.08, TacRank.progress(xp))))
+                Circle().trim(from: 0, to: CGFloat(max(0.08, HBLevel.progress(xp))))
                     .stroke(Color(red: 0.35, green: 0.85, blue: 0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: -2) {
@@ -189,7 +189,7 @@ struct AirbladeScoreboard: View {
     let close: () -> Void
     @EnvironmentObject var game: Game
 
-    private var myLevel: Int { TacRank.index(TacRank.totalXP(game.s.ex.tac ?? TacData())) + 1 }
+    private var myLevel: Int { HBLevel.level(TacRank.totalXP(game.s.ex.tac ?? TacData())) }
 
     private func level(_ p: TPlayer) -> Int { p.isPlayer ? 0 : max(1, min(60, p.trophies / 120)) }
 

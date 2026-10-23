@@ -779,6 +779,7 @@ final class TacScene {
             else { solidWalls[wf].addChildNode(n) }
         }
         for f in 0..<3 { chunked(solidWalls[f], into: floorRoot[f]) }
+        if TMap.kind == 10 { buildWater(floorRoot[1]) }
         // debris pool
         debrisMats = [C(0.88, 0.84, 0.74), C(0.55, 0.38, 0.22), C(0.42, 0.43, 0.46), C(0.3, 0.55, 0.25)].map { mat(nil, color: $0) }
         for i in 0..<56 {
@@ -1234,6 +1235,42 @@ final class TacScene {
     // MARK: props
 
     /// Free Roam cars: a low body, a cabin, four wheels and lights; one node per car, moved by the engine
+    /// the river and its bridges (city map): a water slab over the open band, decks with rails over the crossings
+    private func buildWater(_ fr: MXNode) {
+        let off = TMap.off
+        let rx0 = TCity.riverX0 + off, rx1 = TCity.riverX1 + off
+        let top = TCity.riverTop, bot = TCity.riverBot
+        func six(_ m: MXMaterial) -> [MXMaterial] { Array(repeating: m, count: 6) }
+        let wm = MXMaterial()
+        wm.lightingModel = .blinn
+        wm.diffuse.contents = UIColor(red: 0.05, green: 0.26, blue: 0.42, alpha: 1)
+        wm.emission.contents = UIColor(red: 0.02, green: 0.07, blue: 0.12, alpha: 1)
+        wm.specular.contents = UIColor(white: 0.8, alpha: 1)
+        wm.shininess = 0.9
+        let water = box(CGRect(x: rx0, y: top, width: rx1 - rx0, height: bot - top), h: 1, y0: 0.5, mats: six(wm))
+        water.castsShadow = false
+        fr.addChildNode(water)
+        let foam = mat(nil, color: UIColor(red: 0.7, green: 0.85, blue: 0.9, alpha: 1), emission: UIColor(red: 0.12, green: 0.16, blue: 0.18, alpha: 1))
+        for x in [rx0, rx1 - 8] {
+            let f = box(CGRect(x: x, y: top, width: 8, height: bot - top), h: 0.4, y0: 1.4, mats: six(foam))
+            f.castsShadow = false
+            fr.addChildNode(f)
+        }
+        let deck = mat(nil, color: UIColor(red: 0.14, green: 0.14, blue: 0.16, alpha: 1))
+        let line = mat(nil, color: UIColor(red: 0.9, green: 0.75, blue: 0.2, alpha: 1), emission: UIColor(red: 0.2, green: 0.16, blue: 0.03, alpha: 1))
+        let rail = mat(nil, color: UIColor(red: 0.5, green: 0.52, blue: 0.56, alpha: 1))
+        for j in TCity.bridgeRows {
+            let w = TCity.roadW(j), cy = TCity.ys[j]
+            let x0 = rx0 - 60, len = rx1 - rx0 + 120
+            fr.addChildNode(box(CGRect(x: x0, y: cy - w / 2, width: len, height: w), h: 1.5, y0: 1.5, mats: six(deck)))
+            let cl = box(CGRect(x: x0, y: cy - 2, width: len, height: 4), h: 0.2, y0: 3.0, mats: six(line))
+            cl.castsShadow = false
+            fr.addChildNode(cl)
+            fr.addChildNode(box(CGRect(x: x0, y: cy - w / 2, width: len, height: 6), h: 14, y0: 3, mats: six(rail)))
+            fr.addChildNode(box(CGRect(x: x0, y: cy + w / 2 - 6, width: len, height: 6), h: 14, y0: 3, mats: six(rail)))
+        }
+    }
+
     private func buildCars(_ e: TacticalEngine, _ root: MXNode) {
         carNodes = []
         guard e.gameMode == 10 else { return }

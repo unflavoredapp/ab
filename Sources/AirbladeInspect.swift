@@ -225,12 +225,12 @@ struct HeroInspectView: View {
                 TacInsignia(idx: ri, size: 26 * u).frame(width: 30 * u, height: 30 * u)
                 VStack(alignment: .leading, spacing: 2 * u) {
                     Text(TacRank.ranks[ri].name.uppercased()).font(.jk(11 * u, .heavy)).foregroundColor(.white)
-                    Text("Lv. \(ri + 1)  ·  \(Int(TacRank.progress(xp) * 100))% to next").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.55))
+                    Text("Lv. \(HBLevel.level(xp))  ·  \(Int(HBLevel.progress(xp) * 100))% to next").font(.jk(8.5 * u, .medium)).foregroundColor(.white.opacity(0.55))
                 }
             }
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.12))
-                Capsule().fill(blue).frame(width: 196 * u * CGFloat(TacRank.progress(xp)))
+                Capsule().fill(blue).frame(width: 196 * u * CGFloat(HBLevel.progress(xp)))
             }
             .frame(width: 196 * u, height: 3.5 * u)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 5 * u), GridItem(.flexible(), spacing: 5 * u)], spacing: 5 * u) {

@@ -5,7 +5,7 @@ enum TacLobbyMaps {
     static let ids = [3]
     static let fallback = 3
 
-    private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX", "TOWN", "DUEL ARENA"]
+    private static let names = ["THE HOUSE", "THE WOODS", "WAREHOUSE", "TOWN", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX", "TOWN", "DUEL ARENA", "HOODBLOK CITY"]
 
     static func title(_ k: Int) -> String {
         names.indices.contains(k) ? names[k] : "TOWN"
@@ -351,7 +351,7 @@ struct LobbyHome: View {
         .frame(width: size.width, height: size.height)
         .onAppear {
             if ![0, 1, 5, 8, 9, 10].contains(nav.tacMode) { nav.tacMode = 10 }
-            if !TacLobbyMaps.ids.contains(nav.tacMap) { nav.tacMap = TacLobbyMaps.fallback }
+            if !TacLobbyMaps.ids.contains(nav.tacMap) && !(nav.tacMap == 10 && nav.tacMode == 10) { nav.tacMap = TacLobbyMaps.fallback }
         }
     }
 }

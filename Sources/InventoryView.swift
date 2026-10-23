@@ -79,7 +79,7 @@ struct LobbyTopBar: View {
         HStack(spacing: 0) {
             icon("person.crop.circle") { act(.ranks) }.padding(.leading, 18 * u).padding(.trailing, 20 * u)
             topNav("HIDEOUT", 0) { act(.nav(0)) }
-            topNav("MAP", 1) { act(.screen(19)) }
+            topNav("BLOK WATCH", 1) { act(.screen(19)) }
             topNav("CREW", 2) { act(.screen(20)) }
             topNav("INVENTORY", 3) { act(.screen(15)) }
             topNav("SHOP", 4) { act(.screen(21)) }

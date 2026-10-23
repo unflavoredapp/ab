@@ -687,10 +687,10 @@ final class TacticalEngine {
     func setup(gun: String, diff: Int, mode: Int = 0) {
         self.diff = diff
         gameMode = mode
-        TMap.load(mode == 8 || mode == 9 ? 9 : 3)   // Duel and the Movement Lab use the vertical arena, everything else the Town
+        TMap.load(mode == 10 ? 10 : (mode == 8 || mode == 9 ? 9 : 3))   // Duel and the Movement Lab use the vertical arena, everything else the Town
         tags = []
         myGun = gun
-        let nb = mode == 10 ? 18 : mode == 9 ? 7 : (mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9)))
+        let nb = mode == 10 ? 30 : mode == 9 ? 7 : (mode == 8 ? 1 : (mode == 6 ? 36 : (mode == 7 ? TFront.bots : 9)))
         var names: [(String, String, String)] = TacRoster.pick(nb)
         while names.count < nb { let k = names.count + 1; names.append(("Recruit \(k)", "recruit\(k)", "")) }
         players = [TPlayer(id: 0, team: 0, name: TacProfile.name, handle: "you", emoji: "", isPlayer: true)]
@@ -1276,6 +1276,7 @@ final class TacticalEngine {
     private func playerUpdate(_ dt: CGFloat, _ planting: inout Bool, _ defusing: inout Bool) {
         let p = me
         guard p.alive else { return }
+        if gameMode == 10 && roam.driving >= 0 { roamDrive(dt); return }
         if p.crouch && !coverNear(p) { p.crouch = false }
         let legMul: CGFloat = (gameMode == 6 && legWound) ? 0.62 : 1
         let sp: CGFloat = (p.crouch ? 88 : (p.knife ? 195 : 170)) * (scoped ? 0.6 : (ads ? 0.75 : 1)) * legMul
@@ -3308,11 +3309,11 @@ extension TacticalEngine {
     func roamSetup() {
         roam = RoamState()
         roam.owned = RoamState.loadOwned()
-        roam.pool = TMap.spreadPoints(70, sep: 180)
+        roam.pool = TMap.spreadPoints(170, sep: 340)
         if roam.pool.isEmpty { roam.pool = TMap.spawns }
         roam.hideout = TMap.atkSpawn[min(2, TMap.atkSpawn.count - 1)]
         var homes: [CGPoint] = []
-        for c in roam.pool.shuffled() where tDist(c, roam.hideout) > 1000 && homes.allSatisfy({ tDist($0, c) > 1100 }) {
+        for c in roam.pool.shuffled() where tDist(c, roam.hideout) > 1800 && homes.allSatisfy({ tDist($0, c) > 2400 }) {
             homes.append(c)
             if homes.count == 2 { break }
         }
@@ -3320,19 +3321,20 @@ extension TacticalEngine {
         roam.homes = homes
         for p in players where !p.isPlayer {
             let i = p.id - 1
-            if i < 10 {
+            if i < 18 {
                 p.civ = true; p.team = 1; p.crew = 0
-                p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana"][i]
+                p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana", "Devon", "Mia", "Terrell", "Sasha", "Andre", "Lena", "Cruz", "Imani"][i]
                 p.handle = p.name.lowercased()
             } else {
                 p.civ = false; p.team = 1
-                p.crew = i < 14 ? 1 : 2
-                p.tier = (i == 13 || i == 16) ? 1 : (i == 17 ? 2 : 0)
+                p.crew = i < 24 ? 1 : 2
+                p.tier = (i == 21 || i == 23 || i == 27 || i == 28) ? 1 : (i == 29 ? 2 : 0)
                 roamArm(p)
                 if p.tier == 2 { p.name = "RAZOR"; p.handle = "razor"; roam.bossID = p.id }
                 p.home = homes[p.crew - 1]
             }
         }
+        roamSpawnCars()
         roam.offers = roamOffers()
         if let pd = OWWorld.pending {
             OWWorld.pending = nil
@@ -3360,9 +3362,9 @@ extension TacticalEngine {
         }
         switch pd.kind {
         case .drop:
-            let other = roam.pool.filter { OWWorld.districtAt($0) != d.id && tDist($0, spawn) > 1000 }.randomElement() ?? roam.pool.randomElement() ?? spawn
+            let other = roam.pool.filter { OWWorld.districtAt($0) != d.id && tDist($0, spawn) > 2400 }.randomElement() ?? roam.pool.randomElement() ?? spawn
             var j = RoamJob(id: 901, kind: .drop, title: "DEAD DROP: \(d.name)", brief: "Deliver across town.", reward: 450)
-            j.pts = [spawn, other]; j.timeLeft = 170; j.district = d.id
+            j.pts = [spawn, other]; j.timeLeft = 280; j.district = d.id
             return j
         case .boss:
             var j = RoamJob(id: 902, kind: .boss, title: "TAKE DOWN RAZOR", brief: "Put the boss down.", reward: 1100)
@@ -3380,8 +3382,8 @@ extension TacticalEngine {
     private func roamControl(_ id: Int, _ delta: Int) {
         let r = OWWorld.shared.add(id, delta)
         let name = OWDistrict.base[id].name
-        if r.old < 55 && r.new >= 55 { banner = "TERRITORY CAPTURED  ·  \(name)"; bannerT = 3.5 }
-        else if r.old > 35 && r.new <= 35 { banner = "TERRITORY LOST  ·  \(name)"; bannerT = 3.5 }
+        if r.old < 55 && r.new >= 55 { banner = "TERRITORY CAPTURED  ·  \(name)"; bannerT = 3.5; BlokNet.shared.emit(.captured(id)) }
+        else if r.old > 35 && r.new <= 35 { banner = "TERRITORY LOST  ·  \(name)"; bannerT = 3.5; BlokNet.shared.emit(.lost(id)) }
     }
 
     private func roamHP(_ p: TPlayer) -> CGFloat {
@@ -3396,6 +3398,7 @@ extension TacticalEngine {
         p.nades = 0; p.smokes = 0; p.flashes = 0; p.stun = 0; p.goalT = 0; p.roam = .zero
         p.z = 0; p.vz = 0; p.knock = .zero
         if p.isPlayer {
+            roam.driving = -1
             p.pos = roam.startPos ?? roam.hideout
             roam.startPos = nil
             p.aim = TMap.aimAtCenter(p.pos)
@@ -3454,6 +3457,7 @@ extension TacticalEngine {
         if roam.comboT == 0 { roam.step = 0 }
         roam.swingT = max(0, roam.swingT - dt)
         me.arm = roam.weapon
+        BlokNet.shared.tick(Double(dt))
         for i in roam.feed.indices { roam.feed[i].life -= dt }
         roam.feed.removeAll { $0.life <= 0 }
         if roam.reloadT > 0 {
@@ -3475,6 +3479,10 @@ extension TacticalEngine {
                 // don't chase across the whole town: go back to the corner
                 p.targetID = -1; p.hunt = 0; p.roam = .zero
             }
+        }
+        for car in roam.cars where car.wrecked {
+            car.wreckT -= dt
+            if car.wreckT <= 0 { car.pos = car.home; car.heading = car.homeHeading; car.speed = 0; car.hp = 120 }
         }
         jobTick(dt)
     }
@@ -3593,6 +3601,8 @@ extension TacticalEngine {
     func roamKilled(_ v: TPlayer, killer: TPlayer?) {
         roamPush(killer: killer, victim: v)
         if v.isPlayer {
+            if roam.driving >= 0 { roam.cars[roam.driving].speed = 0; roam.driving = -1 }
+            BlokNet.shared.emit(.youDown(killer?.name ?? "the streets"))
             let loss = Int(CGFloat(roam.cash) * 0.15)
             roam.cash -= loss
             roam.step = 0; roam.comboT = 0
@@ -3604,10 +3614,12 @@ extension TacticalEngine {
         let dis = OWWorld.districtAt(v.pos)
         if v.civ {
             roam.civKOs += 1
+            BlokNet.shared.emit(.civHurt(v.name))
             pay = Int.random(in: 8...35)
             roamControl(dis, -1)
         } else {
             roam.crewKOs += 1
+            BlokNet.shared.emit(v.tier == 2 ? .bossDown(v.name) : .crewKO(v.name, v.tier))
             OWOnline.shared.progress(1)
             pay = [60, 120, 400][min(2, v.tier)]
             roamControl(dis, [2, 3, 8][min(2, v.tier)])
@@ -3649,10 +3661,10 @@ extension TacticalEngine {
     }
 
     func roamOffers() -> [RoamJob] {
-        let a = roam.pool.filter { tDist($0, me.pos) > 700 && tDist($0, me.pos) < 1800 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
-        let b = roam.pool.filter { tDist($0, a) > 1200 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
+        let a = roam.pool.filter { tDist($0, me.pos) > 1500 && tDist($0, me.pos) < 4200 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
+        let b = roam.pool.filter { tDist($0, a) > 2600 }.randomElement() ?? roam.pool.randomElement() ?? roam.hideout
         var drop = RoamJob(id: roam.jobsDone * 3 + 1, kind: .drop, title: "DEAD DROP", brief: "Grab a package across town and deliver it. The clock is running.", reward: 450)
-        drop.pts = [a, b]; drop.timeLeft = 150
+        drop.pts = [a, b]; drop.timeLeft = 260
         var turf = RoamJob(id: roam.jobsDone * 3 + 2, kind: .turf, title: "TURF WAR", brief: "Knock out 5 crew members. Both crews count.", reward: 650)
         turf.need = 5
         let boss = RoamJob(id: roam.jobsDone * 3 + 3, kind: .boss, title: "TAKE DOWN RAZOR", brief: "Viper Row's boss is tough. Bring your combos.", reward: 1100)
@@ -3677,6 +3689,7 @@ extension TacticalEngine {
         guard let j = roam.job else { return }
         roam.cash += j.reward
         roam.jobsDone += 1
+        BlokNet.shared.emit(.jobDone(j.title))
         let jd = j.district >= 0 ? j.district : OWWorld.districtAt(me.pos)
         if j.capture {
             let cur = OWWorld.shared.control(jd, base: OWDistrict.base[jd].control)
@@ -3802,5 +3815,108 @@ extension TacticalEngine {
         let kn = killer == nil ? "STREET" : (killer!.isPlayer ? "YOU" : killer!.name.uppercased())
         roam.feed.append(RoamFeedItem(killer: kn, victim: v.isPlayer ? "YOU" : v.name.uppercased(), weapon: w, life: 5, mine: mine, boss: v.tier == 2))
         if roam.feed.count > 4 { roam.feed.removeFirst() }
+    }
+}
+
+// MARK: - Free Roam cars
+
+extension TacticalEngine {
+
+    func roamSpawnCars() {
+        roam.driving = -1
+        roam.cars = TCity.carSpots.enumerated().map { i, s in
+            RoamCar(pos: CGPoint(x: s.0.x + TMap.off, y: s.0.y), heading: s.1, color: i % 6)
+        }
+    }
+
+    /// closest car you could climb into
+    var roamNearCar: Int? {
+        guard roam.driving < 0, me.alive else { return nil }
+        var best: Int? = nil
+        var bd: CGFloat = 105
+        for (i, c) in roam.cars.enumerated() where !c.wrecked {
+            let d = tDist(c.pos, me.pos)
+            if d < bd { bd = d; best = i }
+        }
+        return best
+    }
+
+    /// the CAR button: get in the nearest car, or step out
+    func roamInteract() {
+        if roam.driving >= 0 {
+            let c = roam.cars[roam.driving]
+            roam.driving = -1
+            var out = CGPoint(x: c.pos.x - sin(c.heading) * 62, y: c.pos.y + cos(c.heading) * 62)
+            TMap.push(&out, 16)
+            me.pos = out
+            me.aim = c.heading
+            c.speed = 0
+        } else if let i = roamNearCar {
+            roam.driving = i
+            me.crouch = false
+            pvel = .zero
+            roam.cars[i].speed = 0
+            banner = "DRIVING"
+            bannerT = 1
+        }
+    }
+
+    func roamDrive(_ dt: CGFloat) {
+        let c = roam.cars[roam.driving]
+        let p = me
+        wantJump = false; wantDash = false; wantReload = false; wantSwap = false; wantSlash = false; lookDelta = 0
+        let throttle = max(-1, min(1, -move.dy)), steer = max(-1, min(1, move.dx))
+        let maxFwd: CGFloat = 820, maxRev: CGFloat = 260
+        if throttle > 0.05 {
+            c.speed += (c.speed < 0 ? 700 : 440) * throttle * dt
+        } else if throttle < -0.05 {
+            c.speed += (c.speed > 0 ? -640 : -260) * -throttle * dt
+        } else {
+            let f = 170 * dt
+            c.speed = abs(c.speed) <= f ? 0 : c.speed - (c.speed > 0 ? f : -f)
+        }
+        c.speed = max(-maxRev, min(maxFwd, c.speed))
+        let turn = steer * 2.3 * min(1, abs(c.speed) / 170) * (1 - 0.4 * abs(c.speed) / maxFwd) * (c.speed >= 0 ? 1 : -1)
+        c.heading += turn * dt
+        var np = CGPoint(x: c.pos.x + cos(c.heading) * c.speed * dt, y: c.pos.y + sin(c.heading) * c.speed * dt)
+        let before = np
+        TMap.push(&np, 30)
+        let shove = hypot(np.x - before.x, np.y - before.y)
+        if shove > 0.4 {
+            let hit = abs(c.speed)
+            if hit > 150 { c.hp -= (hit - 120) / 9; shake = max(shake, min(10, hit / 70)) }
+            c.speed *= 0.35
+        }
+        c.pos = np
+        p.pos = np
+        p.noiseT = abs(c.speed) > 200 ? 1 : p.noiseT
+        // knock people over: bodies in front of the bumper
+        if abs(c.speed) > 200 {
+            let fx = cos(c.heading), fy = sin(c.heading)
+            for v in players where v.alive && !v.isPlayer && v.stun <= 0 {
+                let dx = v.pos.x - (c.pos.x + fx * 38), dy = v.pos.y - (c.pos.y + fy * 38)
+                if hypot(dx, dy) < 46 {
+                    knifeKill = true
+                    damage(v, min(70, abs(c.speed) / 8), by: p.id)
+                    knifeKill = false
+                    if !v.alive && v.civ { BlokNet.shared.emit(.runOver(v.name)) }
+                    v.knock = CGVector(dx: fx * 340, dy: fy * 340)
+                    v.stun = 1.1
+                    c.speed *= 0.93
+                    shake = max(shake, 5)
+                }
+            }
+        }
+        // the camera swings in behind the car
+        p.aim = turnToward(p.aim, c.heading, 5 * dt)
+        if c.hp <= 0 {
+            c.wreckT = 45
+            c.speed = 0
+            roamInteract()
+            BlokNet.shared.emit(.wreck)
+            banner = "CAR WRECKED"
+            bannerT = 1.5
+            damage(p, 12, by: p.id)
+        }
     }
 }

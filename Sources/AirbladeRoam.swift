@@ -46,6 +46,7 @@ struct RoamState {
     var lastDistrict = -1
     /// weapons: 0 fists, 1 bat, 2 pistol; owned slots persist between sessions
     var weapon = 0
+    var waypoint: CGPoint? = nil
     var owned: Set<Int> = [0]
     static let magSize = 12
     var ammo = 12
@@ -177,7 +178,7 @@ struct RoamHUD: View {
     /// arrow + distance to the objective
     private var tracker: some View {
         Group {
-            if e.roam.job != nil, let t = e.roamMarker {
+            if let t = e.roamMarker {
                 let dx = t.x - e.me.pos.x, dy = t.y - e.me.pos.y
                 let fwd = dx * cos(e.me.aim) + dy * sin(e.me.aim)
                 let rgt = dx * -sin(e.me.aim) + dy * cos(e.me.aim)
@@ -246,13 +247,33 @@ struct RoamHUD: View {
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(red: 0.55, green: 0.7, blue: 1).opacity(0.25), lineWidth: 1))
     }
 
+    @ObservedObject private var prefs = RoamPrefs.shared
+    @State private var settingsOpen = false
+    @State private var mapBig = false
+
+    private var gearButton: some View {
+        Button { settingsOpen.toggle() } label: {
+            Image(systemName: "slider.horizontal.3").font(.system(size: 14, weight: .semibold)).foregroundColor(.white)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.black.opacity(0.5)))
+                .overlay(Circle().stroke(Color.white.opacity(0.25), lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
     var body: some View {
-        ZStack {
+        let sc = CGFloat(prefs.scale)
+        let left = prefs.mapLeft
+        let mapPad: CGFloat = left ? 18 : 64
+        let shift: CGFloat = left ? (mapBig ? 250 : 62 + prefs.mapDia - 92) : 0
+        return ZStack {
+            Group {
             contractCard
+                .scaleEffect(sc, anchor: .topLeading)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 18).padding(.top, 62)
+                .padding(.leading, 18).padding(.top, 62 + shift)
                 .allowsHitTesting(false)
             pills
+                .scaleEffect(sc, anchor: .top)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 8)
                 .allowsHitTesting(false)
@@ -261,27 +282,45 @@ struct RoamHUD: View {
                 tracker
                 RoamThreat(e: e)
                 RoamEventCard()
+                RoamRepToast()
             }
+            .scaleEffect(sc, anchor: .top)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, 36)
             .allowsHitTesting(false)
-            jobsButton
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 18).padding(.top, 150)
-            RoamMinimap(e: e)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.trailing, 64).padding(.top, 8)
-                .allowsHitTesting(false)
-            RoamFeedView(e: e)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.trailing, 64).padding(.top, 122)
-                .allowsHitTesting(false)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) { jobsButton; gearButton }
+                RoamCrewStrip(e: e)
+            }
+            .scaleEffect(sc, anchor: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.leading, 18).padding(.top, 150 + shift)
+            RoamMinimap(e: e, size: prefs.mapDia, big: $mapBig)
+                .scaleEffect(sc, anchor: left ? .topLeading : .topTrailing)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: left ? .topLeading : .topTrailing)
+                .padding(left ? .leading : .trailing, mapPad).padding(.top, 8)
+            }
+            Group {
+            if !mapBig {
+                RoamFeedView(e: e)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.trailing, 64).padding(.top, left ? 8 : 122)
+                    .allowsHitTesting(false)
+            }
             if e.roam.driving < 0 {
                 RoamWeaponBar(e: e)
+                    .scaleEffect(sc, anchor: .bottom)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 12)
             }
+            if prefs.ticker {
+                RoamTicker(e: e)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, e.roam.driving < 0 ? 50 : 12)
+                    .allowsHitTesting(false)
+            }
             RoamCarHUD(e: e)
+                .scaleEffect(sc, anchor: .trailing)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 .padding(.trailing, 14)
             if phoneOpen {
@@ -290,6 +329,11 @@ struct RoamHUD: View {
             }
             if e.roam.jobsOpen {
                 jobsPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if settingsOpen {
+                RoamHUDSettings { settingsOpen = false }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
             }
         }
     }

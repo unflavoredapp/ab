@@ -23,7 +23,7 @@ struct RoamCompass: View {
         let heading = Double(e.me.aim) * 180 / .pi + 90   // 0 = north
         let w: CGFloat = 220, ppd: CGFloat = 1.6
         var objDelta: Double? = nil
-        if e.roam.job != nil, let t = e.roamMarker {
+        if let t = e.roamMarker {
             let b = Double(atan2(t.y - e.me.pos.y, t.x - e.me.pos.x)) * 180 / .pi + 90
             objDelta = wrap(b - heading)
         }
@@ -61,7 +61,7 @@ struct RoamThreat: View {
     let e: TacticalEngine
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { tl in
-            let rivals = e.players.filter { !$0.isPlayer && !$0.civ && $0.crew > 0 && $0.alive }
+            let rivals = e.players.filter { !$0.isPlayer && !$0.civ && $0.crew > 0 && !$0.ally && $0.alive }
             let chasing = rivals.filter { $0.targetID == 0 }.count
             let searching = rivals.filter { $0.targetID < 0 && $0.hunt > 0 }.count
             let pulse = 0.5 + 0.5 * sin(tl.date.timeIntervalSinceReferenceDate * 6)

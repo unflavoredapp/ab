@@ -5,21 +5,40 @@ import SwiftUI
 struct RoamMinimap: View {
     let e: TacticalEngine
     var size: CGFloat = 92
-    private let span: CGFloat = 1100      // world units shown edge to edge
+    @Binding var big: Bool
+    private var span: CGFloat { big ? 2400 : 1100 }
+    private var dia: CGFloat { big ? 210 : size }
+
+    /// rivals chasing you, or a war you are fighting in this district
+    private var isHot: Bool {
+        if e.players.contains(where: { !$0.isPlayer && !$0.civ && !$0.ally && $0.alive && $0.targetID == 0 }) { return true }
+        if let j = e.roam.job, j.kind == .turf, j.district == e.roam.lastDistrict { return true }
+        return false
+    }
 
     var body: some View {
-        TimelineView(.animation) { _ in
-            let name = e.roam.lastDistrict >= 0 ? OWDistrict.all[e.roam.lastDistrict].name : "TOWN"
+        TimelineView(.animation) { tl in
+            let dIdx = e.roam.lastDistrict
+            let name = dIdx >= 0 ? OWDistrict.all[dIdx].name : "TOWN"
+            let ring: Color = dIdx >= 0 ? OWDistrict.all[dIdx].color : Color(red: 0.3, green: 0.65, blue: 1)
+            let pulse = isHot ? 0.5 + 0.5 * sin(tl.date.timeIntervalSinceReferenceDate * 5) : 0
             VStack(spacing: 3) {
                 Canvas { ctx, sz in draw(&ctx, sz) }
-                    .frame(width: size, height: size)
+                    .frame(width: dia, height: dia)
                     .background(Circle().fill(Color(red: 0.03, green: 0.06, blue: 0.1).opacity(0.85)))
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color(red: 0.3, green: 0.65, blue: 1).opacity(0.7), lineWidth: 1.5))
+                    .overlay(Circle().stroke(ring.opacity(0.75), lineWidth: 2))
+                    .overlay(Circle().stroke(Color(red: 1, green: 0.3, blue: 0.26).opacity(pulse), lineWidth: 4))
                     .shadow(color: .black.opacity(0.5), radius: 3)
-                Text(name).font(.jk(7.5, .heavy)).tracking(0.8).foregroundColor(.white)
-                    .padding(.horizontal, 6).frame(height: 13)
-                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                    .contentShape(Circle())
+                    .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { big.toggle() } }
+                HStack(spacing: 4) {
+                    Circle().fill(ring).frame(width: 5, height: 5)
+                    Text(name).font(.jk(7.5, .heavy)).tracking(0.8).foregroundColor(.white)
+                    if dIdx >= 0 { Text("\(OWDistrict.all[dIdx].control)%").font(.jk(7.5, .heavy)).foregroundColor(ring).monospacedDigit() }
+                }
+                .padding(.horizontal, 6).frame(height: 13)
+                .background(Capsule().fill(Color.black.opacity(0.5)))
             }
         }
     }
@@ -29,20 +48,44 @@ struct RoamMinimap: View {
         let k = sz.width / span
         let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
         func s(_ p: CGPoint) -> CGPoint { CGPoint(x: c.x + (p.x - me.pos.x) * k, y: c.y + (p.y - me.pos.y) * k) }
+        func w(_ q: CGPoint) -> CGPoint { CGPoint(x: me.pos.x + (q.x - c.x) / k, y: me.pos.y + (q.y - c.y) / k) }
         let win = CGRect(x: me.pos.x - span / 2 - 40, y: me.pos.y - span / 2 - 40, width: span + 80, height: span + 80)
         var walls = Path()
         for r in TMap.solid where r.minX > -5000 && r.intersects(win) {
             walls.addRect(CGRect(x: s(r.origin).x, y: s(r.origin).y, width: r.width * k, height: r.height * k))
         }
         ctx.fill(walls, with: .color(Color(red: 0.32, green: 0.45, blue: 0.62).opacity(0.75)))
+        // district boundaries in their control colour
+        let st: CGFloat = big ? 7 : 6
+        let n = Int(sz.width / st)
+        let all = OWDistrict.all
+        var grid = [[Int]](repeating: [Int](repeating: 0, count: n + 1), count: n + 1)
+        for gx in 0...n { for gy in 0...n { grid[gx][gy] = OWWorld.districtAt(w(CGPoint(x: CGFloat(gx) * st, y: CGFloat(gy) * st))) } }
+        for gx in 0..<n { for gy in 0..<n {
+            let d0 = grid[gx][gy]
+            let x = CGFloat(gx) * st, y = CGFloat(gy) * st
+            if grid[gx + 1][gy] != d0 {
+                ctx.fill(Path(CGRect(x: x + st - 0.7, y: y, width: 1.6, height: st)), with: .color(all[d0].color.opacity(0.9)))
+            }
+            if grid[gx][gy + 1] != d0 {
+                ctx.fill(Path(CGRect(x: x, y: y + st - 0.7, width: st, height: 1.6)), with: .color(all[d0].color.opacity(0.9)))
+            }
+        } }
+        // parked and wrecked cars
+        for car in e.roam.cars where !car.wrecked {
+            let q = s(car.pos)
+            if hypot(q.x - c.x, q.y - c.y) > sz.width / 2 - 3 { continue }
+            ctx.fill(Path(roundedRect: CGRect(x: q.x - 2.2, y: q.y - 1.5, width: 4.4, height: 3), cornerRadius: 0.8), with: .color(Color.white.opacity(0.7)))
+        }
         // other people
         for p in e.players where p.alive && !p.isPlayer {
             let q = s(p.pos)
             let d = hypot(q.x - c.x, q.y - c.y)
             if d > sz.width / 2 - 3 { continue }
-            let col: Color = p.civ ? Color.white.opacity(0.45) : (p.tier == 2 ? Color(red: 1, green: 0.25, blue: 0.3) : RoamCrew.cols[min(2, max(0, p.crew))])
+            let col: Color = p.civ ? Color.white.opacity(0.45) : (p.ally ? Color(red: 0.3, green: 0.75, blue: 1) : (p.tier == 2 ? Color(red: 1, green: 0.25, blue: 0.3) : RoamCrew.cols[min(2, max(0, p.crew))]))
             let r: CGFloat = p.tier == 2 ? 3.6 : (p.civ ? 1.7 : 2.6)
             ctx.fill(Path(ellipseIn: CGRect(x: q.x - r, y: q.y - r, width: r * 2, height: r * 2)), with: .color(col))
+            if p.ally { ctx.stroke(Path(ellipseIn: CGRect(x: q.x - r - 1.5, y: q.y - r - 1.5, width: r * 2 + 3, height: r * 2 + 3)), with: .color(col.opacity(0.7)), lineWidth: 0.8) }
         }
         // objective
         if let m = e.roamMarker {

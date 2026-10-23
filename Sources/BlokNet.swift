@@ -252,9 +252,11 @@ final class BlokNet: ObservableObject {
     // MARK: ambient city drama
 
     func tick(_ dt: Double) {
+        let f = RoamPrefs.shared.phoneFreq
+        guard f > 0 else { return }
         ambientT -= dt
         guard ambientT <= 0 else { return }
-        ambientT = Double.random(in: 70...140)
+        ambientT = Double.random(in: 70...140) * (f == 1 ? 2.5 : 1)
         let hd = Int.random(in: 0..<OWDistrict.base.count)
         let n = district(hd)
         let pick = Int.random(in: 0..<6)

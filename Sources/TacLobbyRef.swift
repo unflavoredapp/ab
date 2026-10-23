@@ -291,7 +291,7 @@ struct LobbyHome: View {
             case 1: act(.screen(16))
             case 2: act(.launch(5))
             case 3: act(.launch(1))
-            default: act(.launch(10))
+            default: act(.screen(23))
             }
         } label: {
             HStack {

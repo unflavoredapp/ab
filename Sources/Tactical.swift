@@ -320,6 +320,7 @@ final class TPlayer {
     var dummy = false
     /// Free Roam: pedestrian (never fights), crew id (0 none), tier (0 regular, 1 bruiser, 2 boss), hit stun
     var civ = false
+    var ally = false
     var crew = 0
     var tier = 0
     var stun: CGFloat = 0
@@ -1544,7 +1545,7 @@ final class TacticalEngine {
             hitMarkT = 0.22
             hitKind = amt >= 45 ? 1 : 0
             if knifeKill { comboN += 1; comboT = 1.6; bestCombo = max(bestCombo, comboN) }
-            pop(victim.pos, "\(Int(max(1, amt)))", amt >= 30 ? TUI.gold : Color.white)
+            if gameMode != 10 || RoamPrefs.shared.dmgNumbers { pop(victim.pos, "\(Int(max(1, amt)))", amt >= 30 ? TUI.gold : Color.white) }
         }
         if victim.isPlayer && owner > -2 { shake = max(shake, 8) }
         if victim.isPlayer && gameMode == 6 && owner >= 0 && amt >= 10 { raidWound() }
@@ -1912,7 +1913,7 @@ final class TacticalEngine {
             p.seeT = 0.12
             var best: TPlayer? = nil
             var bd = CGFloat.greatestFiniteMagnitude
-            for e in players where e.team != p.team && e.alive {
+            for e in players where e.team != p.team && e.alive && !(p.ally && e.civ) {
                 let d = TMap.pdist(p.pos, e.pos)
                 if d < raidSight(p) && d < bd && see(p.pos, e.pos) { best = e; bd = d }
             }
@@ -3309,6 +3310,8 @@ extension TacticalEngine {
     func roamSetup() {
         roam = RoamState()
         roam.owned = RoamState.loadOwned()
+        let sw = UserDefaults.standard.integer(forKey: "ab.loadout.weapon")
+        if roam.owned.contains(sw) { roam.weapon = sw }
         roam.pool = TMap.spreadPoints(170, sep: 340)
         if roam.pool.isEmpty { roam.pool = TMap.spawns }
         roam.hideout = TMap.atkSpawn[min(2, TMap.atkSpawn.count - 1)]
@@ -3321,7 +3324,14 @@ extension TacticalEngine {
         roam.homes = homes
         for p in players where !p.isPlayer {
             let i = p.id - 1
-            if i < 18 {
+            if i >= 15 && i < 18 && RoamPrefs.crewOn {
+                // your crew: follow, fight rivals, regroup
+                p.civ = false; p.ally = true; p.team = 0; p.crew = 3; p.tier = 0
+                p.name = ["Rico", "Dee", "Nia"][i - 15]
+                p.handle = p.name.lowercased()
+                p.arm = 1; p.mag = 99
+                p.home = roam.hideout
+            } else if i < 18 {
                 p.civ = true; p.team = 1; p.crew = 0
                 p.name = ["Marcus", "Dee", "Tasha", "Rico", "Nia", "Omar", "Keisha", "Luis", "Jamal", "Ana", "Devon", "Mia", "Terrell", "Sasha", "Andre", "Lena", "Cruz", "Imani"][i]
                 p.handle = p.name.lowercased()
@@ -3347,7 +3357,7 @@ extension TacticalEngine {
             // a crew corner in the same district, a short walk away
             if let h = area.filter({ tDist($0, spawn) > 450 }).randomElement() ?? area.last {
                 roam.homes[0] = h
-                for p in players where p.crew == 1 { p.home = h }
+                for p in players where p.crew == 1 && !p.ally { p.home = h }
             }
             roam.job = roamPendingJob(pd, spawn: spawn)
         }
@@ -3415,6 +3425,14 @@ extension TacticalEngine {
             p.pos = spot
             p.aim = CGFloat.random(in: 0...(2 * CGFloat.pi))
             setGun(p, "pistol")
+        } else if p.ally {
+            let a = CGFloat(p.id) * 2.1
+            var q = CGPoint(x: me.pos.x + cos(a) * 110, y: me.pos.y + sin(a) * 110)
+            TMap.push(&q, 16)
+            p.pos = q
+            p.aim = me.aim
+            setGun(p, "pistol")
+            p.arm = 1; p.mag = 99
         } else {
             let near = roam.pool.filter { tDist($0, p.home) < 260 }
             p.pos = near.randomElement() ?? p.home
@@ -3427,6 +3445,12 @@ extension TacticalEngine {
 
     /// crew members patrol around their corner; pedestrians are handled in roamTick
     func roamGoal(_ p: TPlayer) -> CGPoint {
+        if p.ally {
+            let d = tDist(p.pos, me.pos)
+            if d < 150 { return p.pos }
+            let a = CGFloat(p.id) * 2.1
+            return CGPoint(x: me.pos.x + cos(a) * 110, y: me.pos.y + sin(a) * 110)
+        }
         if p.roam == .zero || tDist(p.pos, p.roam) < 50 || Int.random(in: 0..<500) == 0 {
             let c = roam.pool.filter { tDist($0, p.home) < 420 }
             p.roam = c.randomElement() ?? p.home
@@ -3475,16 +3499,38 @@ extension TacticalEngine {
             guard p.alive else { continue }
             if p.civ {
                 civTick(p, dt, mePos)
+            } else if p.ally {
+                allyTick(p, dt)
             } else if tDist(p.pos, p.home) > 1100 && p.targetID >= 0 {
                 // don't chase across the whole town: go back to the corner
                 p.targetID = -1; p.hunt = 0; p.roam = .zero
             }
         }
+        if let w = roam.waypoint, tDist(w, me.pos) < 80 { roam.waypoint = nil }
         for car in roam.cars where car.wrecked {
             car.wreckT -= dt
             if car.wreckT <= 0 { car.pos = car.home; car.heading = car.homeHeading; car.speed = 0; car.hp = 120 }
         }
         jobTick(dt)
+    }
+
+    /// crew AI upkeep: catch up when left behind, jump to you when far away
+    private func allyTick(_ p: TPlayer, _ dt: CGFloat) {
+        guard me.alive, roam.driving < 0 else {
+            // you are in a car: they hang back near where you were
+            return
+        }
+        let d = tDist(p.pos, me.pos)
+        if p.targetID < 0 && d > 1500 { roamPlace(p) }
+        else if p.targetID >= 0 && d > 900 { p.targetID = -1; p.hunt = 0 }
+    }
+
+    /// crew status for the strip
+    func allyStatus(_ p: TPlayer) -> String {
+        if !p.alive { return "DOWN" }
+        if p.targetID >= 0 { return "FIGHTING" }
+        if tDist(p.pos, me.pos) > 450 { return "REGROUPING" }
+        return "FOLLOWING"
     }
 
     private func civTick(_ p: TPlayer, _ dt: CGFloat, _ mePos: CGPoint) {
@@ -3609,6 +3655,11 @@ extension TacticalEngine {
             if let j = roam.job, j.kind == .drop { roamFail("YOU WENT DOWN") }
             return
         }
+        if let k = killer, k.ally, !v.civ, !v.ally {
+            roamControl(OWWorld.districtAt(v.pos), [1, 2, 5][min(2, v.tier)])
+            if v.tier == 2 { BlokNet.shared.emit(.bossDown(v.name)) }
+            return
+        }
         guard killer?.isPlayer == true else { return }
         var pay = 0
         let dis = OWWorld.districtAt(v.pos)
@@ -3638,12 +3689,12 @@ extension TacticalEngine {
     // MARK: jobs
 
     var roamMarker: CGPoint? {
-        guard let j = roam.job else { return nil }
+        guard let j = roam.job else { return roam.waypoint }
         switch j.kind {
         case .drop: return j.stage < j.pts.count ? j.pts[j.stage] : nil
         case .boss: return players.first(where: { $0.id == roam.bossID && $0.alive })?.pos
         case .turf:
-            let c = players.filter { $0.alive && !$0.civ && !$0.isPlayer && (j.district < 0 || OWWorld.districtAt($0.pos) == j.district) }
+            let c = players.filter { $0.alive && !$0.civ && !$0.ally && !$0.isPlayer && (j.district < 0 || OWWorld.districtAt($0.pos) == j.district) }
             if let n = c.min(by: { tDist($0.pos, me.pos) < tDist($1.pos, me.pos) }) { return n.pos }
             return j.district >= 0 ? OWWorld.townPoint(j.district) : nil
         }

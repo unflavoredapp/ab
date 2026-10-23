@@ -61,6 +61,7 @@ struct LobbyView: View {
                     case 20: OWCrewView(t: t, size: g.size, act: homeAct)
                     case 21: OWShopView(t: t, size: g.size, act: homeAct)
                     case 22: OWEventsView(t: t, size: g.size, act: homeAct)
+                    case 23: OWLoadoutView(t: t, size: g.size, act: homeAct)
                     case 17: HeroInspectView(t: t, size: g.size, act: homeAct)
                     case 18: AirbladeProgressView(t: t, size: g.size, act: homeAct)
                     case 16: MissionBoardView(t: t, size: g.size, diff: $diff, act: homeAct) { op in

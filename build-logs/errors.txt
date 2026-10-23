@@ -1,0 +1,3 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+/Users/runner/work/ab/ab/Sources/AirbladeRoamHUD2.swift:139:36: error: function declares an opaque return type, but has no return statements in its body from which to infer an underlying type
+/Users/runner/work/ab/ab/Sources/TacticalScene.swift:1281:13: error: cannot find 'root' in scope

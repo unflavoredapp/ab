@@ -3,7 +3,7 @@ import UIKit
 
 /// Pre-baked top-down map image used by the first-person radar. Built once, drawn as one image per frame.
 enum TacRadar {
-    static var k: CGFloat { TMap.kind == 4 ? 0.09 : 0.35 }
+    static var k: CGFloat { (TMap.kind == 4 || TMap.kind == 10) ? 0.09 : 0.35 }
 
     private static var cache: [UIImage] = []
     private static var cacheKind = -1

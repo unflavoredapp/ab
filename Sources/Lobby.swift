@@ -134,7 +134,7 @@ struct LobbyView: View {
     }
 
     private func startLoading() {
-        TMap.load(TacLobbyMaps.ids.contains(nav.tacMap) ? nav.tacMap : TacLobbyMaps.fallback)
+        TMap.load((nav.tacMode == 10 && nav.tacMap == 10) || TacLobbyMaps.ids.contains(nav.tacMap) ? nav.tacMap : TacLobbyMaps.fallback)
         mapImg = TacRadar.image(1)
         loadP = 0
         screen = 3
@@ -213,7 +213,7 @@ struct LobbyView: View {
         case .loadout: break
         case .launch(let m):
             nav.tacMode = m
-            nav.tacMap = TacLobbyMaps.fallback
+            nav.tacMap = m == 10 ? 10 : TacLobbyMaps.fallback
             startMatch()
         }
     }

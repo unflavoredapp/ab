@@ -9,9 +9,9 @@ enum TMap {
     static let nFloors = 3
     static var W: CGFloat = 3000
     static var H: CGFloat = 1800
-    static var look: Int { kind == 9 ? 3 : ((kind == 6 || kind == 7) ? 0 : ((kind == 4 || kind == 5) ? 2 : kind)) }
+    static var look: Int { (kind == 9 || kind == 10) ? 3 : ((kind == 6 || kind == 7) ? 0 : ((kind == 4 || kind == 5) ? 2 : kind)) }
     /// the AIRBLADE town look and rules (tall building fronts, cobbles, open sky): Town and the Duel arena
-    static var townStyle: Bool { kind == 3 || kind == 9 }
+    static var townStyle: Bool { kind == 3 || kind == 9 || kind == 10 }
     static var totalW: CGFloat { off * 3 }
     static let th: CGFloat = 14
     static let wallH: CGFloat = 80
@@ -92,7 +92,7 @@ enum TMap {
 
     static func site(_ i: Int) -> CGRect { i == 0 ? siteA : siteB }
     static var siteNames: [String] { cur.siteNames }
-    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE YARD", "DESERT OUTPOST", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX"]
+    static let mapNames = ["THE HOUSE", "THE WOODS", "WAREHOUSE YARD", "DESERT OUTPOST", "HARBOR COMPLEX", "CUSTOM MAP", "BLOCK 9", "ANNEX", "TOWN", "DUEL ARENA", "HOODBLOK CITY"]
 
     static func roomName(_ p: CGPoint) -> String {
         for r in rooms where r.r.contains(p) { return r.name }
@@ -194,6 +194,7 @@ enum TMap {
         _ = THouse.shared
         if k == 4 { W = THarbor.W; floorW = THarbor.W; off = THarbor.W + 200; H = THarbor.W }
         if k == 7 { W = TAnnex.W; floorW = TAnnex.W; H = TAnnex.H }
+        if k == 10 { W = TCity.W; floorW = TCity.W; off = TCity.W + 200; H = TCity.W }
         switch k {
         case 1: cur = TWoods.shared
         case 2: cur = TWarehouse.shared
@@ -203,6 +204,7 @@ enum TMap {
         case 6: cur = TApartment.shared
         case 7: cur = TAnnex.shared
         case 9: cur = TArena.shared
+        case 10: cur = TCity.shared
         default: cur = THouse.shared
         }
         let d = cur

@@ -9,6 +9,7 @@ struct RoamPhone: View {
 
     @State private var app = ""            // "" is the home screen
     @State private var toast = ""
+    @ObservedObject private var net = BlokNet.shared
 
     private let gold = Color(red: 1, green: 0.8, blue: 0.25)
     private let blue = Color(red: 0.4, green: 0.65, blue: 1)
@@ -17,11 +18,13 @@ struct RoamPhone: View {
 
     private struct App { let id: String; let icon: String; let title: String; let tint: Color }
     private var apps: [App] {
-        [App(id: "jobs", icon: "briefcase.fill", title: "Jobs", tint: gold), App(id: "map", icon: "map.fill", title: "Map", tint: blue),
-         App(id: "crew", icon: "person.3.fill", title: "Crew", tint: blue), App(id: "inv", icon: "bag.fill", title: "Inventory", tint: blue),
-         App(id: "shop", icon: "cart.fill", title: "Shop", tint: Color.green), App(id: "events", icon: "calendar", title: "Events", tint: Color.red),
-         App(id: "msg", icon: "message.fill", title: "Messages", tint: Color.green), App(id: "set", icon: "gearshape.fill", title: "Settings", tint: .gray),
-         App(id: "contacts", icon: "person.crop.circle.fill", title: "Contacts", tint: blue)]
+        let pink = Color(red: 1, green: 0.35, blue: 0.5), orange = Color(red: 1, green: 0.55, blue: 0.2)
+        return [App(id: "blokup", icon: "bubble.left.and.bubble.right.fill", title: "BLOKUP", tint: pink), App(id: "blokchat", icon: "message.fill", title: "BLOKCHAT", tint: Color.green),
+                App(id: "watch", icon: "eye.fill", title: "BLOK WATCH", tint: blue),
+                App(id: "rep", icon: "crown.fill", title: "REP", tint: gold), App(id: "trends", icon: "flame.fill", title: "TRENDS", tint: orange),
+                App(id: "myblok", icon: "person.crop.circle.fill", title: "MY BLOK", tint: Color.purple),
+                App(id: "jobs", icon: "briefcase.fill", title: "Jobs", tint: gold), App(id: "shop", icon: "cart.fill", title: "Shop", tint: Color.green),
+                App(id: "set", icon: "gearshape.fill", title: "Settings", tint: .gray)]
     }
 
     private func say(_ s: String) {
@@ -72,7 +75,9 @@ struct RoamPhone: View {
                     .background(RoundedRectangle(cornerRadius: 8).fill(LinearGradient(colors: [a.tint.opacity(0.7), a.tint.opacity(0.3)], startPoint: .top, endPoint: .bottom)))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25), lineWidth: 0.7))
                     .overlay(alignment: .topTrailing) {
-                        if a.id == "jobs" && e.roam.job == nil { Text("3").font(.jk(6.5, .heavy)).foregroundColor(.white).frame(width: 11, height: 11).background(Circle().fill(Color.red)).offset(x: 3, y: -3) }
+                        if a.id == "blokchat" && net.unreadChats > 0 { Text("\(net.unreadChats)").font(.jk(6.5, .heavy)).foregroundColor(.white).frame(width: 11, height: 11).background(Circle().fill(Color.red)).offset(x: 3, y: -3) }
+                        else if a.id == "blokup" && net.posts.count > net.seenPosts { Text("\(min(9, net.posts.count - net.seenPosts))").font(.jk(6.5, .heavy)).foregroundColor(.white).frame(width: 11, height: 11).background(Circle().fill(Color.red)).offset(x: 3, y: -3) }
+                        else if a.id == "jobs" && e.roam.job == nil { Text("3").font(.jk(6.5, .heavy)).foregroundColor(.white).frame(width: 11, height: 11).background(Circle().fill(Color.red)).offset(x: 3, y: -3) }
                     }
                 Text(a.title).font(.jk(6.5, .medium)).foregroundColor(.white.opacity(0.9))
             }
@@ -83,7 +88,7 @@ struct RoamPhone: View {
         VStack(spacing: 6) {
             HStack(spacing: 4) {
                 Image(systemName: "crown.fill").font(.system(size: 10)).foregroundColor(Color(red: 1, green: 0.6, blue: 0.2))
-                Text("HOOD WARS").font(.jk(10, .heavy)).italic().foregroundColor(.white.opacity(0.9))
+                Text("BLOK PHONE").font(.jk(10, .heavy)).italic().foregroundColor(.white.opacity(0.9))
             }
             .padding(.top, 4)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 8) {
@@ -237,6 +242,7 @@ struct RoamPhone: View {
 
     @ViewBuilder private var screen: some View {
         switch app {
+        case "blokup", "blokchat", "watch", "rep", "trends", "myblok": BlokApp(kind: app, e: e, back: { withAnimation(.easeOut(duration: 0.18)) { app = "" } }, openJobs: openJobs)
         case "map": mapApp
         case "crew", "contacts": crewApp
         case "inv": invApp

@@ -65,6 +65,7 @@ final class TacScene {
     var heads: [MXNode] = []
     var guns: [MXNode] = []
     var bats: [MXNode] = []
+    var carNodes: [MXNode] = []
     var pistols: [MXNode] = []
     var pflashes: [MXNode] = []
     var flashes: [MXNode] = []
@@ -756,13 +757,20 @@ final class TacScene {
             let tile: CGFloat = wf == 1 ? 160 : 128
             let townWall = TMap.townStyle && wf == 1
             let tall = townWall || (woodsMap && wf == 1 && min(o.width, o.height) > 40)
-            let hh: CGFloat = tall ? 260 : wallH
+            var hh: CGFloat = tall ? 260 : wallH
+            if townWall && TMap.kind == 10 {
+                // city skyline: every building gets its own height, Downtown towers over the rest
+                let dd = OWWorld.districtAt(CGPoint(x: o.midX - TMap.off, y: o.midY))
+                let hv = abs(Int(o.minX / 25) &* 31 &+ Int(o.minY / 25) &* 17) % 5
+                hh = 200 + CGFloat(hv) * 60 + (dd == 1 ? 320 : (dd == 2 ? -40 : 0))
+            }
             var front = mat(img, sx: o.width / tile, sy: hh / tile)
             var side = mat(img, sx: o.height / tile, sy: hh / tile)
             var cap = capMats[wf]
             if townWall, let fac = townTex("town_facade_\(abs(Int(o.minX / 25) &* 7 &+ Int(o.minY / 25) &* 13) % 3)") {
-                front = mat(fac, sx: max(1, (o.width / 220).rounded()), sy: 1)
-                side = mat(fac, sx: max(1, (o.height / 220).rounded()), sy: 1)
+                let vr = max(1, (hh / 260).rounded())
+                front = mat(fac, sx: max(1, (o.width / 220).rounded()), sy: vr)
+                side = mat(fac, sx: max(1, (o.height / 220).rounded()), sy: vr)
                 front.normal.intensity = 0.35; side.normal.intensity = 0.35
                 if let rf = townTex("town_roof") { cap = mat(rf, sx: o.width / 160, sy: o.height / 160) }
             }
@@ -1167,6 +1175,7 @@ final class TacScene {
             roots.append(rt); bodies.append(body); heads.append(head); guns.append(gun); flashes.append(fl)
             headKey.append("")
         }
+        buildCars(e)
         // pools
         for _ in 0..<60 {
             let b = MXNode(geometry: MXBox(width: 26, height: 2.4, length: 2.4, chamferRadius: 0))
@@ -1223,6 +1232,56 @@ final class TacScene {
     }
 
     // MARK: props
+
+    /// Free Roam cars: a low body, a cabin, four wheels and lights; one node per car, moved by the engine
+    private func buildCars(_ e: TacticalEngine) {
+        carNodes = []
+        guard e.gameMode == 10 else { return }
+        let cols: [UIColor] = [UIColor(red: 0.75, green: 0.12, blue: 0.12, alpha: 1), UIColor(red: 0.12, green: 0.3, blue: 0.75, alpha: 1),
+                               UIColor(red: 0.85, green: 0.78, blue: 0.2, alpha: 1), UIColor(white: 0.16, alpha: 1),
+                               UIColor(white: 0.82, alpha: 1), UIColor(red: 0.12, green: 0.5, blue: 0.3, alpha: 1)]
+        let glass = mat(nil, color: UIColor(red: 0.08, green: 0.1, blue: 0.14, alpha: 1))
+        let tyre = mat(nil, color: UIColor(white: 0.05, alpha: 1))
+        let lamp = mat(nil, color: UIColor(red: 1, green: 0.95, blue: 0.7, alpha: 1), emission: UIColor(red: 1, green: 0.9, blue: 0.6, alpha: 1))
+        let tail = mat(nil, color: UIColor(red: 0.6, green: 0.05, blue: 0.05, alpha: 1), emission: UIColor(red: 0.8, green: 0.05, blue: 0.05, alpha: 1))
+        for car in e.roam.cars {
+            let g = MXNode()
+            let paint = mat(nil, color: cols[car.color % cols.count])
+            let body = MXNode(geometry: MXBox(width: 110, height: 18, length: 54, chamferRadius: 3))
+            body.geometry?.firstMaterial = paint
+            body.position = MXVector3(0, 17, 0)
+            g.addChildNode(body)
+            let cab = MXNode(geometry: MXBox(width: 58, height: 17, length: 48, chamferRadius: 4))
+            cab.geometry?.materials = [glass]
+            cab.position = MXVector3(-8, 34, 0)
+            g.addChildNode(cab)
+            let roof = MXNode(geometry: MXBox(width: 54, height: 3, length: 46, chamferRadius: 1))
+            roof.geometry?.firstMaterial = paint
+            roof.position = MXVector3(-8, 43.5, 0)
+            g.addChildNode(roof)
+            for (wx, wz) in [(-34.0, -28.0), (-34.0, 28.0), (34.0, -28.0), (34.0, 28.0)] {
+                let w = MXNode(geometry: MXCylinder(radius: 9, height: 7))
+                w.geometry?.firstMaterial = tyre
+                w.eulerAngles = MXVector3(Float.pi / 2, 0, 0)
+                w.position = MXVector3(Float(wx), 9, Float(wz))
+                w.castsShadow = false
+                g.addChildNode(w)
+            }
+            for z in [-18.0, 18.0] {
+                let hl = MXNode(geometry: MXBox(width: 2, height: 5, length: 9, chamferRadius: 0))
+                hl.geometry?.firstMaterial = lamp
+                hl.position = MXVector3(55, 19, Float(z)); hl.castsShadow = false
+                g.addChildNode(hl)
+                let tl = MXNode(geometry: MXBox(width: 2, height: 5, length: 9, chamferRadius: 0))
+                tl.geometry?.firstMaterial = tail
+                tl.position = MXVector3(-55, 19, Float(z)); tl.castsShadow = false
+                g.addChildNode(tl)
+            }
+            g.position = MXVector3(Float(sx(car.pos)), 0, Float(car.pos.y))
+            root.addChildNode(g)
+            carNodes.append(g)
+        }
+    }
 
     private func buildProp(_ pr: TProp) -> MXNode {
         let r = pr.r
@@ -1624,10 +1683,21 @@ final class TacScene {
             camNode.look(at: MXVector3(Float(lx), 0, Float(lz)))
         }
 
+        if e.gameMode == 10 {
+            for (i, car) in e.roam.cars.enumerated() where i < carNodes.count {
+                let n = carNodes[i]
+                let near = tDistS(car.pos, focus.pos) < 3000
+                n.isHidden = !near || car.wrecked
+                if near {
+                    n.position = MXVector3(Float(sx(car.pos)), Float(TMap.floorOf(car.pos) - focusFloor) * stackH + stackAnim - liftF, Float(car.pos.y))
+                    n.eulerAngles = MXVector3(0, Float(-car.heading), 0)
+                }
+            }
+        }
         for (i, p) in e.players.enumerated() {
             let rt = roots[i]
             let show = (e.replayOn || p.team == e.me.team || p.spotted || (!p.alive && p.seenEver)) && (TMap.floorOf(p.pos) == focusFloor || (fpMode && linkedFloors.contains(TMap.floorOf(p.pos)) && TMap.crossLink(focus.pos, p.pos)))
-            rt.isHidden = !show
+            rt.isHidden = !show || (e.gameMode == 10 && i == 0 && e.roam.driving >= 0)
             if !show { continue }
             let ks: Float = fpMode ? 1.18 : 1
             rt.scale = MXVector3(ks, ks * (p.crouch ? 0.74 : 1), ks)
@@ -1987,3 +2057,5 @@ extension TacScene {
         camNode.look(at: MXVector3(Float(cx), 150, Float(cz)))
     }
 }
+
+private func tDistS(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }

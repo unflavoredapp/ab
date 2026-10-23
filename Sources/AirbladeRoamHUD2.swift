@@ -5,7 +5,7 @@ import SwiftUI
 struct RoamMinimap: View {
     let e: TacticalEngine
     var size: CGFloat = 92
-    private let span: CGFloat = 640      // world units shown edge to edge
+    private let span: CGFloat = 1100      // world units shown edge to edge
 
     var body: some View {
         TimelineView(.animation) { _ in
@@ -94,7 +94,11 @@ struct RoamWeaponBar: View {
     private let icons = ["hand.raised.fill", "figure.baseball", "scope"]
 
     var body: some View {
-        VStack(spacing: 4) {
+        TimelineView(.animation) { _ in content }
+    }
+
+    private var content: some View {
+        HStack(spacing: 4) {
             ForEach(0..<3, id: \.self) { w in
                 let owned = e.roam.owned.contains(w)
                 let on = e.roam.weapon == w
@@ -120,5 +124,46 @@ struct RoamWeaponBar: View {
             }
         }
         .shadow(color: .black.opacity(0.4), radius: 2)
+    }
+}
+
+/// ENTER / EXIT button and, while driving, speed and car health
+struct RoamCarHUD: View {
+    let e: TacticalEngine
+    private let gold = Color(red: 1, green: 0.8, blue: 0.25)
+
+    var body: some View {
+        TimelineView(.animation) { _ in content }
+    }
+
+    private var content: some View {
+        let driving = e.roam.driving >= 0
+        let car: RoamCar? = driving ? e.roam.cars[e.roam.driving] : nil
+        VStack(alignment: .trailing, spacing: 6) {
+            if let c = car {
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(alignment: .lastTextBaseline, spacing: 3) {
+                        Text("\(Int(abs(c.speed) * 0.11))").font(.jk(26, .heavy)).monospacedDigit().foregroundColor(.white)
+                        Text("KM/H").font(.jk(8, .heavy)).foregroundColor(.white.opacity(0.6))
+                    }
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.18))
+                        Capsule().fill(c.hp > 40 ? Color(red: 0.3, green: 0.85, blue: 0.45) : Color(red: 1, green: 0.3, blue: 0.26)).frame(width: 90 * max(0, c.hp) / 120)
+                    }.frame(width: 90, height: 4)
+                }
+                .padding(8).background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.5)))
+            }
+            if driving || e.roamNearCar != nil {
+                Button { e.roamInteract() } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: driving ? "figure.walk" : "car.fill").font(.system(size: 13, weight: .bold))
+                        Text(driving ? "EXIT" : "ENTER CAR").font(.jk(10, .heavy)).tracking(0.8)
+                    }
+                    .foregroundColor(.black).padding(.horizontal, 12).frame(height: 32)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(gold))
+                    .shadow(color: gold.opacity(0.5), radius: 6)
+                }.buttonStyle(.plain)
+            }
+        }
     }
 }

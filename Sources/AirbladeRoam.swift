@@ -52,11 +52,27 @@ struct RoamState {
     var reserve = 36
     var reloadT: CGFloat = 0
     var feed: [RoamFeedItem] = []
+    /// drivable cars and the index of the one you are in (-1 on foot)
+    var cars: [RoamCar] = []
+    var driving = -1
 
     static func loadOwned() -> Set<Int> {
         Set((UserDefaults.standard.array(forKey: "ab.roam.owned") as? [Int]) ?? []).union([0])
     }
     static func saveOwned(_ s: Set<Int>) { UserDefaults.standard.set(Array(s), forKey: "ab.roam.owned") }
+}
+
+final class RoamCar {
+    var pos: CGPoint
+    var heading: CGFloat
+    var speed: CGFloat = 0
+    var hp: CGFloat = 120
+    let home: CGPoint
+    let homeHeading: CGFloat
+    let color: Int
+    var wreckT: CGFloat = 0
+    init(pos: CGPoint, heading: CGFloat, color: Int) { self.pos = pos; self.heading = heading; self.home = pos; self.homeHeading = heading; self.color = color }
+    var wrecked: Bool { wreckT > 0 }
 }
 
 struct RoamFeedItem: Identifiable {
@@ -255,9 +271,14 @@ struct RoamHUD: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(.trailing, 64).padding(.top, 122)
                 .allowsHitTesting(false)
-            RoamWeaponBar(e: e)
+            if e.roam.driving < 0 {
+                RoamWeaponBar(e: e)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 12)
+            }
+            RoamCarHUD(e: e)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 14).padding(.top, 70)
+                .padding(.trailing, 14)
             if phoneOpen {
                 RoamPhone(e: e, close: { phoneOpen = false }, openJobs: { phoneOpen = false; e.roam.jobsOpen = true })
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing).padding(.trailing, 20)
